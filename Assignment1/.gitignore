@@ -1,0 +1,15 @@
+# Datasets (HPatches, GRAF, panoramas) — nunca fazer commit
+data/
+
+# Python
+__pycache__/
+
+# Pesos de redes
+*.pth
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Ambientes virtuais
+venv/
+.venv/

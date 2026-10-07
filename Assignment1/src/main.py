@@ -1,10 +1,1 @@
-"""Command-line entry point for Assignment 1 experiments."""
-
-
-def main() -> None:
-    """Run the assignment workflow."""
-    print("Assignment 1 workflow is not implemented yet.")
-
-
-if __name__ == "__main__":
-    main()
+"""Ponto de entrada por linha de comando: --part1 | --fast | --brief | --part2 | --all."""

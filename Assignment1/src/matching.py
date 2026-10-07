@@ -1,5 +1,1 @@
-"""Feature matching utilities."""
-
-import time
-import cv2
-import numpy as np
+"""Matching de descritores: ratio test + cross-check, vizinho mais próximo mútuo, (FLANN).  [Pessoa A]"""

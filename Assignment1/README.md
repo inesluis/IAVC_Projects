@@ -8,7 +8,7 @@ Requer Python 3.10 ou superior. CPU é suficiente; GPU acelera os métodos apren
 
 ```bash
 python -m venv venv
-venv\Scripts\activate            # Linux/macOS: source venv/bin/activate
+venv\Scripts\activate             
 python -m pip install -r requirements.txt
 ```
 
@@ -23,7 +23,7 @@ python -c "import cv2; print(cv2.__version__, hasattr(cv2, 'xfeatures2d'))"
 > Se outro pacote (ex.: LightGlue) o instalar, corrigir com:
 > `pip uninstall -y opencv-python opencv-contrib-python && pip install opencv-contrib-python==4.13.0.92`
 
-<!-- TODO (Pessoa B): instalação de torch + LightGlue e checkpoints usados. -->
+<!-- TODO (INÊS): instalação de torch + LightGlue e checkpoints usados. -->
 
 ## Dados
 

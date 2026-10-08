@@ -68,7 +68,7 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 - **Possível extra:** repetir a experiência sem limite e discutir a diferença.
 
 ### D06 — Medição de tempos
-- **Estado:** Implementada (deteção/descrição) · Acordada (aquecimento)
+- **Estado:** Implementada (incluindo o aquecimento, `evaluation._warm_up`)
 - **Decisão:** `time.perf_counter()`, em ms. Deteção e descrição são medidas em chamadas separadas
   (`detect()` e depois `compute()`). A criação do objeto OpenCV não entra no tempo. O corte ao
   orçamento (D05) entra no tempo de deteção.
@@ -76,8 +76,14 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 - **Consequência a referir no relatório:** no SIFT e no KAZE, `compute()` reconstrói o espaço de
   escalas, por isso `t_det + t_desc` é maior do que um `detectAndCompute()` único.
 - **Aquecimento (observado):** a primeira chamada ao ORB demorou 961 ms e as seguintes ~7 ms
-  (inicialização interna do OpenCV). A avaliação vai fazer uma execução de aquecimento por método
-  antes de medir. Para métodos em GPU: `torch.cuda.synchronize()` antes de cada leitura do tempo.
+  (inicialização interna do OpenCV). Por isso, `run_hpatches` corre cada pipeline uma vez no
+  primeiro par, sem medir, antes de começar. Para métodos em GPU: `torch.cuda.synchronize()` antes
+  de cada leitura do tempo (Pessoa B).
+- **Como se reportam (`evaluation.evaluate_pair`):** `t_det_ms` e `t_desc_ms` = média por imagem
+  (img1 e imgk); `t_match_ms` = por par (inclui as pesquisas 1→2 e 2→1 do cross-check);
+  `t_total_ms` = 2·(t_det + t_desc) + t_match.
+- **Nota:** as features da imagem 1 são calculadas uma vez por sequência e reutilizadas nos 5
+  pares, por isso o tempo da img1 é o mesmo nas 5 linhas da sequência.
 
 ### D07 — Seeds fixas
 - **Estado:** Implementada (`config.setup_env`)
@@ -134,6 +140,53 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 - **Justificação:** é a forma normal de uso. Os tempos são reportados indicando o CPU. Se for
   preciso isolar o custo algorítmico, pode fixar-se `num_threads=1` e repetir.
 
+### D16 — Matching: ratio test + cross-check, força bruta
+- **Estado:** Implementada (`matching.match_descriptors`, `matching.mutual_nn`)
+- **Decisão:** para cada descritor da img1 procuram-se os 2 vizinhos mais próximos na imgk; aceita-se
+  o match se `d1 < 0,8·d2` (ratio de Lowe) **e** se o melhor vizinho da imgk → img1 for o mesmo ponto
+  (cross-check). Resultado: matches 1-para-1. Por omissão usa-se força bruta (`BFMatcher`, exato).
+- **Justificação:** ratio 0,8 e emparelhamento 1-para-1 são o protocolo de referência do enunciado
+  (§2.8). A força bruta é exata, por isso as diferenças entre métodos não são confundidas com erros da
+  pesquisa aproximada.
+- **Alternativas implementadas:**
+  - `CFG["matching"]["backend"] = "flann"`: KD-trees para float, LSH para binários, `checks=50`. Para
+    a comparação força bruta vs aproximado pedida no stitching (§3.1, passo 4).
+  - `mutual_nn`: só vizinho mútuo, sem ratio (para descritores aprendidos, onde 0,8 pode ser
+    demasiado restritivo).
+- **Detalhe:** o cross-check usa só o 1.º vizinho no sentido 2→1, sem ratio (como o `crossCheck`
+  do OpenCV). Pares com menos de 2 vizinhos são ignorados (o ratio não está definido).
+
+### D17 — Correspondências ground-truth e repetibilidade
+- **Estado:** Implementada (`evaluation.gt_correspondences`)
+- **Decisão:**
+  1. Zona comum: pontos da img1 cuja projeção H·p cai dentro da imgk, e pontos da imgk cuja projeção
+     H⁻¹·p cai dentro da img1.
+  2. Dois pontos podem corresponder se ‖H·p1 − pk‖ < 3 px (erro medido na imgk).
+  3. `N_corresp` = **emparelhamento 1-para-1 máximo** desse grafo bipartido
+     (`scipy.sparse.csgraph.maximum_bipartite_matching`).
+  4. Repetibilidade = `N_corresp / min(n1_visíveis, nk_visíveis)`.
+- **Justificação:** com o emparelhamento máximo, qualquer conjunto de matches corretos 1-para-1 cabe
+  em `N_corresp`, o que garante **N_correct ≤ N_corresp** e **recall ≤ 1**. O greedy do `starter.py`
+  (para cada ponto, o vizinho mais próximo; se já usado, desiste) pode subcontar e dar recall > 1.
+- **Verificação:** com H = identidade e a mesma imagem, repetibilidade = precisão = recall = 1,0 nos 6
+  métodos. Num subconjunto de 4 sequências (120 linhas): MS = PMR × precision, recall ≤ 1 e
+  N_correct ≤ N_corresp em todas as linhas.
+- **Limitação a referir:** a repetibilidade é calculada com os keypoints depois do `compute()`, por
+  isso FAST+BRIEF/BRISK/FREAK têm valores ligeiramente diferentes (cada descritor remove pontos
+  diferentes da borda). A repetibilidade "pura" do detetor FAST é medida no estudo do FAST (T6).
+
+### D18 — Casos limite e agregação
+- **Estado:** Implementada (`evaluation.evaluate_pair`, `evaluation.summarize`)
+- **Casos limite:**
+  - `N_putative = 0` → precisão 0 (o método falhou nesse par; com NaN a média ficaria inflacionada).
+  - `N_corresp = 0` → recall e repetibilidade NaN (não há o que recuperar; excluídos da média).
+  - `N_features = 0` → PMR e MS = 0.
+- **Agregação:** média por par ("macro"), agrupada por pipeline × categoria (`i`/`v`) e por
+  pipeline × categoria × k (curvas F1). As contagens (denominadores) também são médias por par e
+  aparecem ao lado das métricas na T2.
+- **Robustez:** um erro num par/pipeline não pára a corrida: fica registado na coluna `error` e na
+  tabela `errors`.
+
 ## Ambiente e repositório
 
 ### D13 — Ambiente Python
@@ -146,6 +199,14 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
   pela Pessoa B.
 - **pandas:** instalado no `cvc` em 2026-10-08 (versão 3.0.6) para `evaluation.py`; o OpenCV ficou intacto
   (só opencv-contrib-python 4.13.0.92).
+- **Incidente (2026-10-08, 11:26):** ao instalar o LightGlue no `cvc`, o pip trouxe `opencv-python`
+  5.0.0.93, que se sobrepôs ao contrib (`cv2.__version__` passou a 5.0.0 e `cv2.KAZE_create` deixou de
+  existir). Corrigido com `pip uninstall -y opencv-python opencv-contrib-python` +
+  `pip install opencv-contrib-python==4.13.0.92`. Depois disso o LightGlue continua a importar.
+  **Regra:** depois de instalar qualquer pacote, confirmar com
+  `python -c "import cv2; print(cv2.__version__, hasattr(cv2,'KAZE_create'))"` → `4.13.0 True`.
+  Aviso a registar: o torch indica que `torch.jit.script` não é suportado em Python 3.14 (só um
+  aviso por agora; a Pessoa B deve confirmar que o LightGlue corre).
 
 ### D14 — SURF não avaliado
 - **Estado:** Implementada (verificado)
@@ -171,3 +232,12 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 - **P03** — HPatches completo ou subconjunto para SuperPoint/LightGlue em CPU (a GPU com CUDA
   parece disponível no `cvc`: torch cu126).
 - **P04** — Data de entrega, língua e limite de páginas do relatório.
+- **P05 (2026-10-08)** — **Métricas da homografia por implementar** em `evaluation.py`: inliers do
+  RANSAC, rácio de inliers, erro médio de reprojeção, corner error e % de pares com erro ≤ 1/3/5 px
+  (tabela T4). Dependem de `homography.estimate_homography` (Pessoa B), que ainda não existe. Quando
+  existir: chamá-la em `evaluate_pair`, acrescentar as colunas e a T4 no `summarize`, e registar os
+  limiares no config.
+- **P06 (2026-10-08)** — **Pipelines aprendidos por registar** em `methods.py` (SuperPoint+NN,
+  SuperPoint+LightGlue, SIFT+LightGlue): depende de `learned.py` (Pessoa B).
+- **P07 (2026-10-08)** — `main.py`: só existe `--part1`. Faltam `--fast` e `--brief` (Pessoa A,
+  próximos) e `--part2` (Pessoa B).

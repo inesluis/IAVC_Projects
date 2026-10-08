@@ -56,6 +56,8 @@ CFG = {
     "matching": {
         "ratio": 0.8,          # rejeita se d1/d2 >= 0.8
         "cross_check": True,   # 1-para-1
+        "backend": "bf",       # D16: "bf" (força bruta, exato) ou "flann" (aproximado)
+        "flann_checks": 50,    # nº de folhas visitadas pelo FLANN (exatidão vs velocidade)
     },
 
     # ---- RANSAC (Pessoa B; usado também pela avaliação, D03) ----

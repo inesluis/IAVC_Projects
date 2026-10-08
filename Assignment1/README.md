@@ -54,6 +54,7 @@ Implementado:
 python src/main.py --part1 --tag classic        # HPatches (i/v)          -> results/tables/classic_*.csv
 python src/main.py --rotscale --tag classic     # sintético rotação/escala -> results/tables/classic_rotscale_*.csv
 python src/main.py --robustness --tag classic   # tabela i/v/rot/scale     -> results/tables/classic_robustness.csv
+python src/main.py --qualitative                # figuras GRAF + sintético -> results/figures/*.png
 # opções: --pipelines SIFT ORB ...  --seqs i_ajuntament v_graffiti ...  --max-kps 2000|none
 ```
 

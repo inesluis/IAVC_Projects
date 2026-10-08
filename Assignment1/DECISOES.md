@@ -239,6 +239,30 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
   mudança de iluminação; a média por categoria depende dos níveis escolhidos (por isso as curvas por
   nível são o resultado principal).
 
+### D21 — Figuras qualitativas
+- **Estado:** Implementada (`visualization.py`, `studies/qualitative.py`, `main.py --qualitative`,
+  `CFG["qualitative"]`)
+- **Figuras (em `results/figures/`):**
+  - `graf_keypoints.png`: keypoints de cada método na GRAF img1 (círculo = escala, raio = orientação).
+  - `graf_matches_1to2.png`, `graf_matches_1to4.png`: matches de cada método, **verde = correto**
+    (erro < 3 px com a H GT), **vermelho = errado**. Título com nº de matches, nº de corretos e %.
+  - `synthetic_rot45_matches.png`, `synthetic_scale2_matches.png`: o mesmo para os pares sintéticos
+    de rotação 45° e escala 2×.
+- **Escolhas de legibilidade:** desenham-se só os 500 keypoints mais fortes e uma amostra aleatória
+  (seed fixa) de até 200 matches, que mantém a proporção certos/errados. Os títulos mostram sempre
+  os totais. Os errados são desenhados por cima dos certos, para ficarem visíveis. 100 dpi
+  (≈ 2–4 MB por figura).
+- **Reutilização:** `draw_matches(..., good=mask)` aceita qualquer máscara booleana. A Pessoa B pode
+  usá-la para inliers/outliers do RANSAC no stitching (§3.1, passo 8).
+- **Observações para o relatório (corrida de 2026-10-08):**
+  - GRAF 1→4 (ponto de vista forte): SIFT 49%, KAZE 52%, FAST+FREAK 47%, FAST+BRISK 38%, ORB 32%,
+    FAST+BRIEF 0% (13 matches, todos errados).
+  - Rotação 45°: SIFT 100%, KAZE/BRISK/FREAK 99%, ORB 96%, FAST+BRIEF 0%.
+  - Os 500 keypoints mais fortes do ORB concentram-se no centro e têm círculos grandes (patch de 31 px
+    × fator da pirâmide). O score de Harris favorece zonas de alto contraste e o ORB não força uma
+    distribuição espacial uniforme. SIFT e KAZE espalham pontos por várias escalas; o FAST dá só
+    pontos pequenos, todos à mesma escala.
+
 ## Ambiente e repositório
 
 ### D13 — Ambiente Python
@@ -291,7 +315,7 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
   limiares no config.
 - **P06 (2026-10-08)** — **Pipelines aprendidos por registar** em `methods.py` (SuperPoint+NN,
   SuperPoint+LightGlue, SIFT+LightGlue): depende de `learned.py` (Pessoa B).
-- **P07 (2026-10-08)** — `main.py`: existem `--part1`, `--rotscale` e `--robustness`. Faltam
+- **P07 (2026-10-08)** — `main.py`: existem `--part1`, `--rotscale`, `--robustness` e `--qualitative`. Faltam
   `--fast` e `--brief` (Pessoa A, próximos) e `--part2` (Pessoa B).
-- **P08 (2026-10-08)** — Análise qualitativa GRAF 1→2 e 1→4 (figuras de keypoints e de matches
-  certos/errados) por fazer: `visualization.py`.
+- **P08 (2026-10-08)** — ~~Análise qualitativa GRAF~~ feita (D21). Falta decidir se as figuras
+  (≈ 13 MB) vão para o git ou se se geram só para a entrega.

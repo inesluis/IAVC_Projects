@@ -41,6 +41,12 @@ CFG = {
         "mask_feather_px": 10,    # largura da transição suave da máscara circular (rotação)
     },
 
+    # ---- Figuras qualitativas (D21) ----
+    "qualitative": {
+        "max_keypoints_drawn": 500,    # só os mais fortes, para a figura ser legível
+        "max_matches_drawn": 200,      # amostra aleatória (seed fixa) mantendo a proporção certo/errado
+    },
+
     # ---- Orçamento de pontos comum a todos os métodos (D05) ----
     "max_keypoints": 2000,
 

@@ -6,6 +6,7 @@ Exemplos:
     python src/main.py --part1 --pipelines SIFT ORB --max-kps none --tag nolimit
     python src/main.py --rotscale                               # teste sintético rotação/escala (GRAF img1)
     python src/main.py --robustness --tag classic               # junta i, v, rot, scale numa tabela
+    python src/main.py --qualitative                            # figuras GRAF + sintético -> results/figures/
 
 # PENDENTE (2026-10-08): --fast e --brief (Pessoa A, por implementar), --part2 (Pessoa B).
 """
@@ -17,6 +18,7 @@ import pandas as pd
 from config import get_config, setup_env
 from evaluation import run_hpatches, save_tables, summarize
 from methods import get_pipelines
+from studies.qualitative import run_qualitative
 from studies.rot_scale_study import run_rot_scale
 
 
@@ -78,12 +80,13 @@ def main() -> None:
     ap.add_argument("--part1", action="store_true", help="avaliação no HPatches")
     ap.add_argument("--rotscale", action="store_true", help="teste sintético de rotação e escala")
     ap.add_argument("--robustness", action="store_true", help="tabela i/v/rot/scale a partir dos CSV")
+    ap.add_argument("--qualitative", action="store_true", help="figuras de keypoints e matches (GRAF, sintético)")
     ap.add_argument("--pipelines", nargs="+", default=None, help="subconjunto de pipelines (omissão: todos)")
     ap.add_argument("--seqs", nargs="+", default=None, help="subconjunto de sequências (omissão: todas)")
     ap.add_argument("--max-kps", default=get_config()["max_keypoints"], help="orçamento de keypoints ou 'none'")
     ap.add_argument("--tag", default="", help="prefixo dos ficheiros de resultados")
     args = ap.parse_args()
-    if not (args.part1 or args.rotscale or args.robustness):
+    if not (args.part1 or args.rotscale or args.robustness or args.qualitative):
         ap.print_help()
         return
     if args.part1:
@@ -92,6 +95,9 @@ def main() -> None:
         run_rotscale(args)
     if args.robustness:
         run_robustness(args)
+    if args.qualitative:
+        for path in run_qualitative(get_pipelines(args.pipelines), _cfg_from_args(args)):
+            print("figura:", path)
 
 
 if __name__ == "__main__":

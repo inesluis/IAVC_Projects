@@ -144,7 +144,8 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 - **`requirements.txt`:** mínimo (numpy, scipy, matplotlib, pandas, psutil, opencv-contrib). Nunca
   `opencv-python` (partilha o módulo `cv2` e estraga o contrib). torch e LightGlue são acrescentados
   pela Pessoa B.
-- **Falta:** o `pandas` não está instalado no `cvc` e vai ser preciso para `evaluation.py`.
+- **pandas:** instalado no `cvc` em 2026-10-08 (versão 3.0.6) para `evaluation.py`; o OpenCV ficou intacto
+  (só opencv-contrib-python 4.13.0.92).
 
 ### D14 — SURF não avaliado
 - **Estado:** Implementada (verificado)

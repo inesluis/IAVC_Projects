@@ -54,7 +54,7 @@ def run_robustness(args) -> None:
     df["error"] = df["error"].fillna("")
     df["control"] = df["control"].fillna(False).astype(bool)
     tables = summarize(df)
-    rob = tables["T2_matching"][["precision", "matching_score", "recall"]].join(
+    rob = tables["T2_matching"][["PMR", "precision", "matching_score", "recall"]].join(
         tables["T1_detection"][["repeatability"]]).unstack("category")
     rob = rob.reindex(columns=["i", "v", "rot", "scale"], level=1)
     rob.to_csv(tables_dir / f"{p}robustness.csv", float_format="%.4f")

@@ -189,7 +189,8 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
   tabela `errors`.
 
 ### D19 — Robustez discutida em 4 categorias + análise qualitativa
-- **Estado:** Implementada (`main.py --robustness`, tabela `<tag>_robustness.csv`)
+- **Estado:** Implementada (`main.py --robustness`, tabela `<tag>_robustness.csv` com PMR, precision,
+  matching score, recall e repetibilidade em i/v/rot/scale)
 - **Decisão:** a robustez é avaliada em 4 categorias, cada uma com média por categoria e por nível:
 
   | Categoria | Dados | Nível (coluna `k`) |

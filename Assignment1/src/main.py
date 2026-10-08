@@ -7,6 +7,7 @@ Exemplos:
     python src/main.py --rotscale                               # teste sintético rotação/escala (GRAF img1)
     python src/main.py --robustness --tag classic               # junta i, v, rot, scale numa tabela
     python src/main.py --qualitative                            # figuras GRAF + sintético -> results/figures/
+    python src/main.py --graf --tag classic                     # métricas GRAF 1->2 e 1->3 (por par)
 
 # PENDENTE (2026-10-08): --fast e --brief (Pessoa A, por implementar), --part2 (Pessoa B).
 """
@@ -16,7 +17,8 @@ import argparse
 import pandas as pd
 
 from config import get_config, setup_env
-from evaluation import run_hpatches, save_tables, summarize
+from datasets import load_graf_pairs
+from evaluation import evaluate_pairs, run_hpatches, save_tables, summarize
 from methods import get_pipelines
 from studies.qualitative import run_qualitative
 from studies.rot_scale_study import run_rot_scale
@@ -42,6 +44,25 @@ def run_rotscale(args) -> None:
     tables = summarize(df)
     save_tables(tables, cfg["paths"]["tables"], prefix)
     print(tables["T2_matching"].round(3).to_string())
+
+
+GRAF_COLS = ["N_features", "N_putative", "N_correct", "N_corresp",
+             "PMR", "precision", "matching_score", "recall", "repeatability",
+             "t_det_ms", "t_desc_ms", "t_match_ms"]
+
+
+def run_graf(args) -> None:
+    """GRAF 1->2 e 1->3 (imagem 3 = img4.ppm), mesmo protocolo que o HPatches (D23).
+    Só 2 pares: a tabela mostra cada par (método x par), sem médias."""
+    cfg = _cfg_from_args(args)
+    prefix = _prefix(args.tag) + "graf_"
+    df = evaluate_pairs(get_pipelines(args.pipelines), load_graf_pairs(cfg["paths"]["graf"]), cfg)
+    df.to_csv(cfg["paths"]["tables"] / f"{prefix}raw.csv", index=False)
+    if (df["error"] != "").any():
+        print(df[df["error"] != ""][["pipeline", "k", "error"]].to_string())
+    t = df.assign(par=df["k"].map(lambda n: f"1->{n}")).set_index(["pipeline", "par"])[GRAF_COLS]
+    t.to_csv(cfg["paths"]["tables"] / f"{prefix}pairs.csv", float_format="%.4f")
+    print(t.round(3).to_string())
 
 
 def run_robustness(args) -> None:
@@ -81,18 +102,21 @@ def main() -> None:
     ap.add_argument("--rotscale", action="store_true", help="teste sintético de rotação e escala")
     ap.add_argument("--robustness", action="store_true", help="tabela i/v/rot/scale a partir dos CSV")
     ap.add_argument("--qualitative", action="store_true", help="figuras de keypoints e matches (GRAF, sintético)")
+    ap.add_argument("--graf", action="store_true", help="métricas nos pares GRAF 1->2 e 1->3")
     ap.add_argument("--pipelines", nargs="+", default=None, help="subconjunto de pipelines (omissão: todos)")
     ap.add_argument("--seqs", nargs="+", default=None, help="subconjunto de sequências (omissão: todas)")
     ap.add_argument("--max-kps", default=get_config()["max_keypoints"], help="orçamento de keypoints ou 'none'")
     ap.add_argument("--tag", default="", help="prefixo dos ficheiros de resultados")
     args = ap.parse_args()
-    if not (args.part1 or args.rotscale or args.robustness or args.qualitative):
+    if not (args.part1 or args.rotscale or args.robustness or args.qualitative or args.graf):
         ap.print_help()
         return
     if args.part1:
         run_part1(args)
     if args.rotscale:
         run_rotscale(args)
+    if args.graf:
+        run_graf(args)
     if args.robustness:
         run_robustness(args)
     if args.qualitative:

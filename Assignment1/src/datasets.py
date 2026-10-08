@@ -101,6 +101,21 @@ def load_graf_pair(root: str | Path, k: int) -> ImagePair:
                      gray1=gray1, grayk=grayk, H=load_homography(root / f"H1to{k}p.txt"))
 
 
+# Ficheiro GRAF img<k>.ppm -> número da imagem no relatório (só há 3 imagens: 1, 2, 3; D21).
+GRAF_REPORT_NUMBER = {2: 2, 4: 3}
+
+
+def load_graf_pairs(root: str | Path) -> list[ImagePair]:
+    """Pares GRAF 1->2 e 1->3 com a numeração do relatório (k = 2, 3; a imagem 3 é img4.ppm)
+    e categoria 'graf'."""
+    pairs = []
+    for k_file, k_report in GRAF_REPORT_NUMBER.items():
+        pr = load_graf_pair(root, k_file)
+        pr.k, pr.category = k_report, "graf"
+        pairs.append(pr)
+    return pairs
+
+
 def load_image_set(folder: str | Path, pattern: str = "*.jpg") -> list[tuple[str, np.ndarray]]:
     """Lê um conjunto de imagens para panorama, ordenado pelo nome. Devolve [(nome, bgr), ...]."""
     paths = sorted(Path(folder).glob(pattern))

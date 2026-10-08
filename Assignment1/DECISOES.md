@@ -251,7 +251,7 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 - **Numeração GRAF no relatório (decisão de 2026-10-08):** só temos 3 imagens GRAF, numeradas
   1, 2, 3 no relatório: imagem 1 = `img1.ppm`, imagem 2 = `img2.ppm`, **imagem 3 = `img4.ppm`**
   (homografia `H1to4p.txt`). O código lê `img4.ppm`; só os rótulos usam "3"
-  (`qualitative.GRAF_REPORT_NUMBER`). O cabeçalho do `legendas.md` repete esta correspondência.
+  (`datasets.GRAF_REPORT_NUMBER`, `datasets.load_graf_pairs`). O cabeçalho do `legendas.md` repete esta correspondência.
   - `rot45/`, `scale2/`: o mesmo para os pares sintéticos de rotação 45° e escala 2×.
   - `legendas.md`: legenda pronta para cada figura, gerada com os números da corrida (protocolo de
     matching, totais, linhas mostradas e, no FAST+X, quantos pontos o descritor descartou junto à borda).
@@ -299,6 +299,21 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
   média sobre os 6 métodos: `i_pool` 0,10, `i_tools` 0,21, `i_londonbridge` 0,23, `i_brooklyn` 0,28),
   enquanto as melhores passam de 0,95. É um efeito dos dados, não do código. Vale a pena analisar
   essas sequências na discussão.
+
+### D23 — Métricas nos pares GRAF (1→2 e 1→3)
+- **Estado:** Implementada (`main.py --graf`, `datasets.load_graf_pairs`) e corrida em 2026-10-08
+- **Decisão:** os 2 pares GRAF são avaliados com o mesmo protocolo do HPatches (mesmas métricas, 3 px,
+  ratio 0,8 + cross-check). Como são só 2 pares, **não se fazem médias**: a tabela
+  `<tag>_graf_pairs.csv` mostra cada par (método × par) com os denominadores, PMR, precision, MS,
+  recall, repetibilidade e tempos. Não entra na tabela de robustez (D19), que usa médias.
+- **Justificação:** a utilizadora quis números para acompanhar as figuras qualitativas (D21). Os
+  números das figuras e da tabela coincidem (mesma corrida).
+- **Observações (corrida de 2026-10-08):**
+  - 1→2: precisão ≥ 0,94 em todos os métodos exceto FAST+BRIEF (0,67, só 51 matches).
+  - 1→3: a precisão cai para 0–0,52 (SIFT 0,49; KAZE 0,52; FREAK 0,47; BRISK 0,38; ORB 0,32;
+    BRIEF 0), mas a **repetibilidade mantém-se alta (0,54–0,74)**. Os detetores voltam a encontrar
+    os mesmos pontos; o que falha é o descritor, porque a perspetiva forte deforma a vizinhança de
+    cada ponto. Exemplo claro para separar o desempenho do detetor do desempenho do descritor.
 
 ## Ambiente e repositório
 

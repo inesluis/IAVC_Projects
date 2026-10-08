@@ -14,14 +14,11 @@ A "imagem 3" é o ficheiro img4.ppm (homografia H1to4p.txt).
 
 from pathlib import Path
 
-from datasets import load_graf_pair
+from datasets import load_graf_pair, load_graf_pairs
 from evaluation import match_errors
 from interface import Pipeline
 from studies.rot_scale_study import make_pairs
 from visualization import plot_keypoints, plot_matches, save_figure
-
-# Ficheiro GRAF (img<k>.ppm) -> número da imagem no relatório.
-GRAF_REPORT_NUMBER = {2: 2, 4: 3}
 
 
 def _slug(name: str) -> str:
@@ -100,9 +97,9 @@ def run_qualitative(pipelines: list[Pipeline], cfg: dict) -> list[Path]:
                               f"({lim}{removed}). Cada círculo marca a posição de um keypoint; o tamanho do "
                               f"círculo é fixo e não representa a escala nem a orientação. Eixos em píxeis."))
 
-    # 2) matches GRAF imagem 1 -> imagem n (n = número no relatório; ficheiro img<k>.ppm)
-    for k, n in GRAF_REPORT_NUMBER.items():
-        pr = load_graf_pair(cfg["paths"]["graf"], k)
+    # 2) matches GRAF imagem 1 -> imagem n (n = número no relatório: 2, 3)
+    for pr in load_graf_pairs(cfg["paths"]["graf"]):
+        n = pr.k
         entries += _match_figures(pipelines, f"graf_1to{n}", f"GRAF 1→{n}", "Imagem 1", f"Imagem {n}",
                                   pr.bgr1, pr.bgrk, pr.gray1, pr.grayk, pr.H, cfg, out)
 

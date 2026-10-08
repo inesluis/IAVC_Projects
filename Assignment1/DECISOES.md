@@ -242,26 +242,35 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 ### D21 — Figuras qualitativas
 - **Estado:** Implementada (`visualization.py`, `studies/qualitative.py`, `main.py --qualitative`,
   `CFG["qualitative"]`)
-- **Figuras (em `results/figures/`):**
-  - `graf_keypoints.png`: keypoints de cada método na GRAF img1 (círculo = escala, raio = orientação).
-  - `graf_matches_1to2.png`, `graf_matches_1to4.png`: matches de cada método, **verde = correto**
-    (erro < 3 px com a H GT), **vermelho = errado**. Título com nº de matches, nº de corretos e %.
-  - `synthetic_rot45_matches.png`, `synthetic_scale2_matches.png`: o mesmo para os pares sintéticos
-    de rotação 45° e escala 2×.
-- **Escolhas de legibilidade:** desenham-se só os 500 keypoints mais fortes e uma amostra aleatória
-  (seed fixa) de até 200 matches, que mantém a proporção certos/errados. Os títulos mostram sempre
-  os totais. Os errados são desenhados por cima dos certos, para ficarem visíveis. 100 dpi
-  (≈ 2–4 MB por figura).
-- **Reutilização:** `draw_matches(..., good=mask)` aceita qualquer máscara booleana. A Pessoa B pode
-  usá-la para inliers/outliers do RANSAC no stitching (§3.1, passo 8).
+- **Organização:** **uma figura por método e por objetivo** (mais fácil de colocar no relatório), em
+  `results/figures/qualitative/<objetivo>/<método>.jpg` (`+` → `-` no nome, ex.: `FAST-BRIEF.jpg`):
+  - `keypoints/`: keypoints na GRAF imagem 1.
+  - `graf_1to2/`, `graf_1to4/`: matches; **verde = correto** (erro < 3 px com a H GT),
+    **vermelho = errado**.
+  - `rot45/`, `scale2/`: o mesmo para os pares sintéticos de rotação 45° e escala 2×.
+  - `legendas.md`: legenda pronta para cada figura, gerada com os números da corrida (protocolo de
+    matching, totais, linhas mostradas e, no FAST+X, quantos pontos o descritor descartou junto à borda).
+- **Conteúdo de cada figura:** eixos x/y em píxeis; título com o método e os números (ex.:
+  "KAZE — GRAF 1→4: 27 de 52 matches corretos (52 %)"); cada imagem identificada ("Imagem 1",
+  "Imagem 4", "Imagem 2 (rodada 45°)"); legenda das cores. Na figura de matches, o eixo y da imagem da
+  direita fica à direita, para as linhas não o taparem.
+- **Keypoints:** desenham-se **todos**, com um marcador de tamanho fixo igual para todos os métodos.
+  A 1.ª versão usava a escala do keypoint (`DRAW_RICH_KEYPOINTS`) e só os 500 mais fortes: no ORB
+  isso dava círculos enormes (patch de 31 px × fator da pirâmide) concentrados no centro, o que
+  tornava a comparação ilegível. Com o marcador fixo comparam-se número e distribuição espacial; a
+  escala e a orientação não são representadas (dito na legenda).
+- **Matches:** amostra aleatória (seed fixa) de até 150 linhas, que mantém a proporção
+  certos/errados; os totais estão sempre no título e na legenda; os errados são desenhados por cima.
+- **Formato:** JPEG, qualidade 92, 150 dpi (≈ 13 MB no total para 30 figuras; em PNG eram 39 MB).
+- **Reutilização:** `plot_matches(..., good=mask, good_label=..., bad_label=...)` aceita qualquer
+  máscara booleana. A Pessoa B pode usá-la para inliers/outliers do RANSAC no stitching (§3.1, passo 8).
 - **Observações para o relatório (corrida de 2026-10-08):**
   - GRAF 1→4 (ponto de vista forte): SIFT 49%, KAZE 52%, FAST+FREAK 47%, FAST+BRISK 38%, ORB 32%,
     FAST+BRIEF 0% (13 matches, todos errados).
   - Rotação 45°: SIFT 100%, KAZE/BRISK/FREAK 99%, ORB 96%, FAST+BRIEF 0%.
-  - Os 500 keypoints mais fortes do ORB concentram-se no centro e têm círculos grandes (patch de 31 px
-    × fator da pirâmide). O score de Harris favorece zonas de alto contraste e o ORB não força uma
-    distribuição espacial uniforme. SIFT e KAZE espalham pontos por várias escalas; o FAST dá só
-    pontos pequenos, todos à mesma escala.
+  - Distribuição espacial: o SIFT espalha os pontos por toda a imagem; o ORB concentra-os nas zonas de
+    alto contraste do centro e não tem pontos a menos de ~31 px da borda (`edgeThreshold`). O score de
+    Harris favorece essas zonas e o ORB não força uma distribuição uniforme.
 
 ## Ambiente e repositório
 
@@ -318,4 +327,4 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 - **P07 (2026-10-08)** — `main.py`: existem `--part1`, `--rotscale`, `--robustness` e `--qualitative`. Faltam
   `--fast` e `--brief` (Pessoa A, próximos) e `--part2` (Pessoa B).
 - **P08 (2026-10-08)** — ~~Análise qualitativa GRAF~~ feita (D21). Falta decidir se as figuras
-  (≈ 13 MB) vão para o git ou se se geram só para a entrega.
+  (30 JPEG, ≈ 13 MB) vão para o git ou se se geram só para a entrega.

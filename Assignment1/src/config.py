@@ -43,8 +43,7 @@ CFG = {
 
     # ---- Figuras qualitativas (D21) ----
     "qualitative": {
-        "max_keypoints_drawn": 500,    # só os mais fortes, para a figura ser legível
-        "max_matches_drawn": 200,      # amostra aleatória (seed fixa) mantendo a proporção certo/errado
+        "max_matches_drawn": 150,      # amostra aleatória (seed fixa) mantendo a proporção certo/errado
     },
 
     # ---- Orçamento de pontos comum a todos os métodos (D05) ----

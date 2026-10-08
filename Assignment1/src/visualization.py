@@ -1,11 +1,10 @@
 """Visualizações: keypoints, matches certos/errados, gráficos F1/F2, panoramas.  [A + B]
 
-Funções de desenho (devolvem imagens BGR uint8, reutilizáveis no stitching):
-  draw_keypoints  — keypoints com escala e orientação
-  draw_matches    — duas imagens lado a lado; linhas verdes/vermelhas segundo uma máscara booleana
+Figuras matplotlib com eixos em píxeis e identificação de cada imagem (D21):
+  plot_keypoints  — posição dos keypoints numa imagem, marcador igual para todos os métodos
+  plot_matches    — duas imagens lado a lado; linhas verdes/vermelhas segundo uma máscara booleana
                     (matches corretos vs errados com a H GT, ou inliers vs outliers do RANSAC)
-Funções de figura (matplotlib, para o relatório):
-  panel_grid, save_figure
+  save_figure     — grava (PNG ou JPEG pela extensão) e fecha a figura
 """
 
 from pathlib import Path
@@ -16,88 +15,90 @@ import numpy as np
 
 matplotlib.use("Agg")            # sem janelas: só gravar ficheiros
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.lines import Line2D  # noqa: E402
+from matplotlib.patches import ConnectionPatch  # noqa: E402
 
 from interface import Features  # noqa: E402
 
-GREEN = (0, 200, 0)    # BGR
-RED = (0, 0, 255)
-YELLOW = (0, 220, 255)
+GREEN = "#00b400"
+RED = "#ff2020"
+YELLOW = "#ffd400"
 
 
-def to_bgr(img: np.ndarray) -> np.ndarray:
-    """Converte cinzento para BGR (cópia); imagens BGR são copiadas."""
-    return cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) if img.ndim == 2 else img.copy()
+def _show(ax, img: np.ndarray, title: str) -> None:
+    """Mostra uma imagem (cinzento ou BGR) com eixos em píxeis. Os centros dos píxeis ficam nas
+    coordenadas inteiras, a mesma convenção dos keypoints do OpenCV."""
+    if img.ndim == 2:
+        ax.imshow(img, cmap="gray", vmin=0, vmax=255)
+    else:
+        ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    ax.set_title(title, fontsize=10)
+    ax.set_xlabel("x (px)")
+    ax.set_ylabel("y (px)")
+    ax.tick_params(labelsize=8)
 
 
-def strongest(kps, n: int | None) -> list:
-    """Os n keypoints com maior resposta (todos se n=None)."""
-    kps = list(kps)
-    return kps if n is None or len(kps) <= n else sorted(kps, key=lambda k: -k.response)[:n]
+def plot_keypoints(img: np.ndarray, f: Features, title: str, img_label: str):
+    """Figura com TODOS os keypoints de f sobre img, com o mesmo marcador para todos os métodos.
+    O marcador não representa escala nem orientação: comparam-se número e distribuição espacial."""
+    h, w = img.shape[:2]
+    fig, ax = plt.subplots(figsize=(7, 7 * h / w + 0.5), layout="constrained")
+    _show(ax, img, img_label)
+    pts = f.points()
+    ax.scatter(pts[:, 0], pts[:, 1], s=14, facecolors="none", edgecolors=YELLOW, linewidths=0.8)
+    fig.suptitle(title, fontsize=12)
+    return fig
 
 
-def draw_keypoints(img: np.ndarray, f: Features, max_draw: int | None = 500) -> np.ndarray:
-    """Desenha os keypoints (círculo = escala, raio = orientação, quando o detetor os dá).
-    Para legibilidade desenham-se só os max_draw mais fortes (D21)."""
-    return cv2.drawKeypoints(to_bgr(img), strongest(f.kps, max_draw), None, color=YELLOW,
-                             flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-
-
-def draw_matches(img1: np.ndarray, img2: np.ndarray, f1: Features, f2: Features, matches,
-                 good: np.ndarray | None = None, max_draw: int | None = 200, seed: int = 0) -> np.ndarray:
-    """Duas imagens lado a lado com linhas entre pontos emparelhados.
+def plot_matches(img1: np.ndarray, img2: np.ndarray, f1: Features, f2: Features, matches,
+                 good: np.ndarray | None, label1: str, label2: str, title: str,
+                 good_label: str = "correto", bad_label: str = "errado",
+                 max_draw: int | None = 150, seed: int = 0):
+    """Figura com as duas imagens lado a lado (eixos próprios) e uma linha por match.
 
     good: máscara booleana (len(matches)) -> verde se True, vermelho se False; None -> tudo verde.
     max_draw: nº máximo de linhas (amostra aleatória com seed fixa, mantém a proporção certo/errado).
-    Os errados são desenhados por cima para ficarem visíveis.
+    Os errados são desenhados por cima. Devolve (fig, nº de linhas desenhadas).
     """
-    a, b = to_bgr(img1), to_bgr(img2)
-    h = max(a.shape[0], b.shape[0])
-    canvas = np.zeros((h, a.shape[1] + b.shape[1], 3), np.uint8)
-    canvas[:a.shape[0], :a.shape[1]] = a
-    canvas[:b.shape[0], a.shape[1]:] = b
-    off = a.shape[1]
+    h = max(img1.shape[0], img2.shape[0])
+    w = img1.shape[1] + img2.shape[1]
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 13 * h / w + 0.9), layout="constrained")
+    _show(ax1, img1, label1)
+    _show(ax2, img2, label2)
+    ax2.yaxis.tick_right()                      # eixo y da 2.ª imagem à direita: as linhas não o tapam
+    ax2.yaxis.set_label_position("right")
 
     n = len(matches)
     good = np.ones(n, bool) if good is None else np.asarray(good, bool)
     idx = np.arange(n)
     if max_draw is not None and n > max_draw:
         idx = np.sort(np.random.default_rng(seed).choice(n, max_draw, replace=False))
-    for want in (True, False):                      # verdes primeiro, vermelhos por cima
-        for i in idx[good[idx] == want]:
-            m = matches[i]
-            p = tuple(int(round(v)) for v in f1.kps[m.queryIdx].pt)
-            q = f2.kps[m.trainIdx].pt
-            q = (int(round(q[0])) + off, int(round(q[1])))
-            col = GREEN if want else RED
-            cv2.line(canvas, p, q, col, 1, cv2.LINE_AA)
-            cv2.circle(canvas, p, 3, col, 1, cv2.LINE_AA)
-            cv2.circle(canvas, q, 3, col, 1, cv2.LINE_AA)
-    return canvas
+    for want in (True, False):                       # verdes primeiro, vermelhos por cima
+        col = GREEN if want else RED
+        sel = idx[good[idx] == want]
+        if len(sel) == 0:
+            continue
+        p = np.array([f1.kps[matches[i].queryIdx].pt for i in sel])
+        q = np.array([f2.kps[matches[i].trainIdx].pt for i in sel])
+        ax1.scatter(p[:, 0], p[:, 1], s=12, facecolors="none", edgecolors=col, linewidths=0.8)
+        ax2.scatter(q[:, 0], q[:, 1], s=12, facecolors="none", edgecolors=col, linewidths=0.8)
+        for a, b in zip(p, q):
+            fig.add_artist(ConnectionPatch(xyA=a, coordsA=ax1.transData, xyB=b, coordsB=ax2.transData,
+                                           color=col, linewidth=0.7, alpha=0.85))
+    handles = [Line2D([], [], color=GREEN, lw=2, label=good_label)]
+    if good is not None and (~good).any():
+        handles.append(Line2D([], [], color=RED, lw=2, label=bad_label))
+    fig.legend(handles=handles, loc="outside lower center", ncol=len(handles), fontsize=10, frameon=False)
+    fig.suptitle(title, fontsize=12)
+    return fig, len(idx)
 
 
-def panel_grid(images: list[np.ndarray], titles: list[str], ncols: int = 2,
-               panel_width_in: float = 8.0, suptitle: str = ""):
-    """Figura matplotlib com as imagens BGR em grelha, cada uma com o seu título."""
-    nrows = int(np.ceil(len(images) / ncols))
-    aspect = images[0].shape[0] / images[0].shape[1]
-    title_in = 0.35                              # espaço vertical por título, para não sobrepor imagens
-    fig, axes = plt.subplots(nrows, ncols, squeeze=False,
-                             figsize=(panel_width_in * ncols, (panel_width_in * aspect + title_in) * nrows + 0.6))
-    for ax in axes.ravel():
-        ax.axis("off")
-    for ax, img, t in zip(axes.ravel(), images, titles):
-        ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        ax.set_title(t, fontsize=10)
-    if suptitle:
-        fig.suptitle(suptitle, fontsize=12)
-    fig.tight_layout()
-    return fig
-
-
-def save_figure(fig, path: str | Path, dpi: int = 100) -> Path:
-    """Grava a figura (cria a pasta) e fecha-a."""
+def save_figure(fig, path: str | Path, dpi: int = 150, jpeg_quality: int = 92) -> Path:
+    """Grava a figura (cria a pasta) e fecha-a. Formato pela extensão; .jpg usa jpeg_quality
+    (fotografias ficam ~4-5x mais leves do que em PNG)."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    extra = {"pil_kwargs": {"quality": jpeg_quality}} if path.suffix.lower() in (".jpg", ".jpeg") else {}
+    fig.savefig(path, dpi=dpi, **extra)
     plt.close(fig)
     return path

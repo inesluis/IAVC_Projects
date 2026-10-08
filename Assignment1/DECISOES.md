@@ -277,6 +277,29 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
     alto contraste do centro e não tem pontos a menos de ~31 px da borda (`edgeThreshold`). O score de
     Harris favorece essas zonas e o ORB não força uma distribuição uniforme.
 
+### D22 — Corrida preliminar dos clássicos (2026-10-08)
+- **Estado:** Feita (resultados em `results/tables/classic_*`, fora do git por agora)
+- **Comandos:** `--part1`, `--rotscale` e `--robustness`, todos com `--tag classic`. Parâmetros por
+  omissão do config (2000 kps, ratio 0,8 + cross-check, 3 px, força bruta, 16 threads, i7-12650H).
+- **Execução:** 3480 linhas HPatches (580 pares × 6 métodos) em 913 s; 0 erros. Sintético: 23 níveis × 6.
+- **É preliminar:** a corrida oficial repete-se no fim com os métodos aprendidos e a T4 (P05), numa
+  só execução, para os tempos serem comparáveis.
+- **Observações para o relatório (números desta corrida):**
+  - Precisão i / v / rot / scale: SIFT 0,74 / 0,75 / 0,99 / 0,97; KAZE 0,78 / 0,74 / 0,99 / 0,94;
+    ORB 0,70 / 0,69 / 0,92 / 0,94; FAST+BRIEF 0,78 / 0,60 / 0,09 / 0,57; FAST+BRISK 0,74 / 0,55 /
+    0,99 / 0,50; FAST+FREAK 0,68 / 0,54 / 0,99 / 0,55.
+  - FAST+BRIEF é dos melhores em iluminação (sem rotação/escala) e o pior em rotação: falta de
+    orientação. FAST+X cai em escala (o FAST não tem escala) e em ponto de vista.
+  - SIFT: o recall mais alto em `v` (0,51) e em escala (0,90).
+  - Custo total por par: FAST+BRIEF 23 ms, ORB 41 ms, FAST+BRISK 39 ms, FAST+FREAK 60 ms, SIFT 336 ms,
+    KAZE 1291 ms. Memória dos descritores por imagem: SIFT 878 kB, KAZE 393 kB, ORB 61 kB,
+    FAST+BRIEF 52 kB.
+- **Suspeita resolvida:** no teste com 4 sequências, a precisão em `i_*` (0,4–0,7) parecia baixa. No
+  total fica em 0,68–0,78. A média é puxada para baixo por algumas sequências extremas (precisão
+  média sobre os 6 métodos: `i_pool` 0,10, `i_tools` 0,21, `i_londonbridge` 0,23, `i_brooklyn` 0,28),
+  enquanto as melhores passam de 0,95. É um efeito dos dados, não do código. Vale a pena analisar
+  essas sequências na discussão.
+
 ## Ambiente e repositório
 
 ### D13 — Ambiente Python

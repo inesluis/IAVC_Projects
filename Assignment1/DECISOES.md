@@ -199,7 +199,7 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
   | `rot` rotação | sintético a partir da GRAF img1 (D20) | ângulo (°) |
   | `scale` escala | sintético a partir da GRAF img1 (D20) | fator de escala |
 
-  Mais uma análise qualitativa com o GRAF 1→2 e 1→4 (figuras de matches certos e errados, P08).
+  Mais uma análise qualitativa com o GRAF 1→2 e 1→3 (figuras de matches certos e errados, P08).
 - **Justificação:** o professor pediu explicitamente a discussão de escala, rotação, iluminação e
   ponto de vista (§5 do enunciado). O HPatches só separa `i` e `v`: as `v_*` misturam perspetiva,
   rotação e escala, por isso não permitem isolar a rotação nem a escala.
@@ -245,14 +245,18 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 - **Organização:** **uma figura por método e por objetivo** (mais fácil de colocar no relatório), em
   `results/figures/qualitative/<objetivo>/<método>.jpg` (`+` → `-` no nome, ex.: `FAST-BRIEF.jpg`):
   - `keypoints/`: keypoints na GRAF imagem 1.
-  - `graf_1to2/`, `graf_1to4/`: matches; **verde = correto** (erro < 3 px com a H GT),
+  - `graf_1to2/`, `graf_1to3/`: matches; **verde = correto** (erro < 3 px com a H GT),
     **vermelho = errado**.
+- **Numeração GRAF no relatório (decisão de 2026-10-08):** só temos 3 imagens GRAF, numeradas
+  1, 2, 3 no relatório: imagem 1 = `img1.ppm`, imagem 2 = `img2.ppm`, **imagem 3 = `img4.ppm`**
+  (homografia `H1to4p.txt`). O código lê `img4.ppm`; só os rótulos usam "3"
+  (`qualitative.GRAF_REPORT_NUMBER`). O cabeçalho do `legendas.md` repete esta correspondência.
   - `rot45/`, `scale2/`: o mesmo para os pares sintéticos de rotação 45° e escala 2×.
   - `legendas.md`: legenda pronta para cada figura, gerada com os números da corrida (protocolo de
     matching, totais, linhas mostradas e, no FAST+X, quantos pontos o descritor descartou junto à borda).
 - **Conteúdo de cada figura:** eixos x/y em píxeis; título com o método e os números (ex.:
-  "KAZE — GRAF 1→4: 27 de 52 matches corretos (52 %)"); cada imagem identificada ("Imagem 1",
-  "Imagem 4", "Imagem 2 (rodada 45°)"); legenda das cores. Na figura de matches, o eixo y da imagem da
+  "KAZE — GRAF 1→3: 27 de 52 matches corretos (52 %)"); cada imagem identificada ("Imagem 1",
+  "Imagem 3", "Imagem 2 (rodada 45°)"); legenda das cores. Na figura de matches, o eixo y da imagem da
   direita fica à direita, para as linhas não o taparem.
 - **Keypoints:** desenham-se **todos**, com um marcador de tamanho fixo igual para todos os métodos.
   A 1.ª versão usava a escala do keypoint (`DRAW_RICH_KEYPOINTS`) e só os 500 mais fortes: no ORB
@@ -265,7 +269,7 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 - **Reutilização:** `plot_matches(..., good=mask, good_label=..., bad_label=...)` aceita qualquer
   máscara booleana. A Pessoa B pode usá-la para inliers/outliers do RANSAC no stitching (§3.1, passo 8).
 - **Observações para o relatório (corrida de 2026-10-08):**
-  - GRAF 1→4 (ponto de vista forte): SIFT 49%, KAZE 52%, FAST+FREAK 47%, FAST+BRISK 38%, ORB 32%,
+  - GRAF 1→3 (ponto de vista forte): SIFT 49%, KAZE 52%, FAST+FREAK 47%, FAST+BRISK 38%, ORB 32%,
     FAST+BRIEF 0% (13 matches, todos errados).
   - Rotação 45°: SIFT 100%, KAZE/BRISK/FREAK 99%, ORB 96%, FAST+BRIEF 0%.
   - Distribuição espacial: o SIFT espalha os pontos por toda a imagem; o ORB concentra-os nas zonas de

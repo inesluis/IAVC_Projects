@@ -3,7 +3,10 @@
 results/figures/qualitative/
   keypoints/<método>.jpg      keypoints na GRAF imagem 1
   graf_1to2/<método>.jpg      matches certos (verde) / errados (vermelho), GRAF imagem 1 -> imagem 2
-  graf_1to4/<método>.jpg      idem, GRAF imagem 1 -> imagem 4 (mudança de ponto de vista forte)
+  graf_1to3/<método>.jpg      idem, GRAF imagem 1 -> imagem 3 (mudança de ponto de vista forte)
+
+Numeração no relatório (D21): só temos 3 imagens GRAF, numeradas 1, 2, 3.
+A "imagem 3" é o ficheiro img4.ppm (homografia H1to4p.txt).
   rot45/<método>.jpg          idem, par sintético rotação 45°
   scale2/<método>.jpg         idem, par sintético escala 2x
   legendas.md                 legenda sugerida para cada figura
@@ -16,6 +19,9 @@ from evaluation import match_errors
 from interface import Pipeline
 from studies.rot_scale_study import make_pairs
 from visualization import plot_keypoints, plot_matches, save_figure
+
+# Ficheiro GRAF (img<k>.ppm) -> número da imagem no relatório.
+GRAF_REPORT_NUMBER = {2: 2, 4: 3}
 
 
 def _slug(name: str) -> str:
@@ -65,7 +71,8 @@ def _match_figures(pipelines, group: str, pair_label: str, label1: str, label2: 
 def write_captions(entries: list[tuple[Path, str]], path: Path) -> Path:
     """Grava as legendas em Markdown: caminho relativo + texto."""
     lines = ["# Legendas das figuras qualitativas", "",
-             "Geradas automaticamente por `python src/main.py --qualitative`. Os números são os desta corrida.", ""]
+             "Geradas automaticamente por `python src/main.py --qualitative`. Os números são os desta corrida.", "",
+             "Numeração GRAF: imagem 1 = img1.ppm, imagem 2 = img2.ppm, imagem 3 = img4.ppm.", ""]
     for p, cap in entries:
         lines += [f"**{p.relative_to(path.parent).as_posix()}**", "", cap, ""]
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -93,10 +100,10 @@ def run_qualitative(pipelines: list[Pipeline], cfg: dict) -> list[Path]:
                               f"({lim}{removed}). Cada círculo marca a posição de um keypoint; o tamanho do "
                               f"círculo é fixo e não representa a escala nem a orientação. Eixos em píxeis."))
 
-    # 2) matches GRAF imagem 1 -> imagem k
-    for k in (2, 4):
+    # 2) matches GRAF imagem 1 -> imagem n (n = número no relatório; ficheiro img<k>.ppm)
+    for k, n in GRAF_REPORT_NUMBER.items():
         pr = load_graf_pair(cfg["paths"]["graf"], k)
-        entries += _match_figures(pipelines, f"graf_1to{k}", f"GRAF 1→{k}", "Imagem 1", f"Imagem {k}",
+        entries += _match_figures(pipelines, f"graf_1to{n}", f"GRAF 1→{n}", "Imagem 1", f"Imagem {n}",
                                   pr.bgr1, pr.bgrk, pr.gray1, pr.grayk, pr.H, cfg, out)
 
     # 3) pares sintéticos (D20): imagem 1 = base, imagem 2 = transformada

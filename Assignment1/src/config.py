@@ -33,6 +33,14 @@ CFG = {
         "categories": ["i", "v"],     # iluminação / ponto de vista
     },
 
+    # ---- Teste sintético de rotação e escala (D20) ----
+    "synthetic": {
+        "base_image": ROOT / "data" / "graf" / "img1.ppm",
+        "rotations_deg": list(range(0, 181, 15)),                 # 0° = controlo
+        "scales": [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.25, 1.5, 1.75, 2.0],   # 1.0 = controlo
+        "mask_feather_px": 10,    # largura da transição suave da máscara circular (rotação)
+    },
+
     # ---- Orçamento de pontos comum a todos os métodos (D05) ----
     "max_keypoints": 2000,
 

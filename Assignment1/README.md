@@ -48,10 +48,18 @@ data/hpatches-sequences-release/
 
 ## Como correr
 
-<!-- TODO: preencher quando main.py estiver implementado. -->
+Implementado:
 
 ```bash
-python src/main.py --part1     # avaliação no HPatches  -> results/tables/
+python src/main.py --part1 --tag classic        # HPatches (i/v)          -> results/tables/classic_*.csv
+python src/main.py --rotscale --tag classic     # sintético rotação/escala -> results/tables/classic_rotscale_*.csv
+python src/main.py --robustness --tag classic   # tabela i/v/rot/scale     -> results/tables/classic_robustness.csv
+# opções: --pipelines SIFT ORB ...  --seqs i_ajuntament v_graffiti ...  --max-kps 2000|none
+```
+
+<!-- TODO: por implementar -->
+
+```bash
 python src/main.py --fast      # estudo de parâmetros do FAST
 python src/main.py --brief     # estudo do BRIEF próprio
 python src/main.py --part2     # stitching              -> results/panoramas/
@@ -77,7 +85,7 @@ src/
 ├── stitching.py       panoramas
 ├── methods.py         registo de pipelines
 ├── visualization.py   figuras
-├── studies/           estudos FAST, BRIEF, RANSAC
+├── studies/           estudos FAST, BRIEF, RANSAC, rotação/escala sintética
 └── main.py            ponto de entrada
 tests/                 testes de sanidade
 results/               tables/, figures/, panoramas/

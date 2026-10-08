@@ -181,11 +181,63 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
   - `N_putative = 0` → precisão 0 (o método falhou nesse par; com NaN a média ficaria inflacionada).
   - `N_corresp = 0` → recall e repetibilidade NaN (não há o que recuperar; excluídos da média).
   - `N_features = 0` → PMR e MS = 0.
-- **Agregação:** média por par ("macro"), agrupada por pipeline × categoria (`i`/`v`) e por
-  pipeline × categoria × k (curvas F1). As contagens (denominadores) também são médias por par e
+- **Agregação:** média por par ("macro"), agrupada por pipeline × categoria (`i`/`v`/`rot`/`scale`)
+  e por pipeline × categoria × k (curvas F1; no sintético `k` = nível). Os pares de controlo
+  (coluna `control`) são excluídos das médias por categoria, mas aparecem nas curvas (D20). As contagens (denominadores) também são médias por par e
   aparecem ao lado das métricas na T2.
 - **Robustez:** um erro num par/pipeline não pára a corrida: fica registado na coluna `error` e na
   tabela `errors`.
+
+### D19 — Robustez discutida em 4 categorias + análise qualitativa
+- **Estado:** Implementada (`main.py --robustness`, tabela `<tag>_robustness.csv`)
+- **Decisão:** a robustez é avaliada em 4 categorias, cada uma com média por categoria e por nível:
+
+  | Categoria | Dados | Nível (coluna `k`) |
+  |---|---|---|
+  | `i` iluminação | HPatches `i_*` (57 seq) | par 1→k, k = 2..6 |
+  | `v` ponto de vista | HPatches `v_*` (59 seq) | par 1→k, k = 2..6 |
+  | `rot` rotação | sintético a partir da GRAF img1 (D20) | ângulo (°) |
+  | `scale` escala | sintético a partir da GRAF img1 (D20) | fator de escala |
+
+  Mais uma análise qualitativa com o GRAF 1→2 e 1→4 (figuras de matches certos e errados, P08).
+- **Justificação:** o professor pediu explicitamente a discussão de escala, rotação, iluminação e
+  ponto de vista (§5 do enunciado). O HPatches só separa `i` e `v`: as `v_*` misturam perspetiva,
+  rotação e escala, por isso não permitem isolar a rotação nem a escala.
+- **Porque não usar o GRAF para a rotação/escala:** o GRAF é uma sequência de mudança de ponto de
+  vista (perspetiva forte, com alguma rotação/escala misturadas). Só tem 2 pares e os valores não são
+  controlados, o que não dá médias nem curvas com significado. Serve como exemplo qualitativo,
+  como o enunciado sugere ("particularly for qualitative analysis").
+- **Complemento real possível:** `v_bark` e `v_boat` (sequências de zoom + rotação do conjunto de
+  Oxford, incluídas no HPatches), para confirmar em imagens reais o que o sintético mostra.
+
+### D20 — Teste sintético de rotação e escala
+- **Estado:** Implementada (`studies/rot_scale_study.py`, `CFG["synthetic"]`, `main.py --rotscale`)
+- **Imagem base:** GRAF img1 (320×400, textura rica).
+- **Níveis:** rotação 0°–180° em passos de 15° (13 níveis); escala 0,5; 0,6; 0,7; 0,8; 0,9; 1,0;
+  1,25; 1,5; 1,75; 2,0 (10 níveis). 0° e 1,0 são **controlos**: entram nas curvas, mas não nas
+  médias por categoria (seriam triviais e inflacionariam a média).
+- **Rotação:** em torno do centro, na mesma tela. Antes de rodar, a imagem base fica só com o círculo
+  inscrito, com transição suave (10 px) para um cinzento uniforme (a média da imagem). Assim a rotação
+  não cria nem perde conteúdo, e a borda não gera keypoints falsos. A img1 do par de rotação é esta
+  imagem mascarada.
+- **Escala:** `cv2.resize` em torno do centro, na mesma tela: `INTER_AREA` para reduzir (evita
+  aliasing), `INTER_LINEAR` para ampliar. Na redução, a margem é preenchida com o mesmo cinzento; na
+  ampliação, a imagem é recortada. A H inclui a convenção de centros de pixel do `cv2.resize`
+  (`x' = s·(x + 0,5) − 0,5 + offset`).
+- **H ground-truth:** é a própria transformação aplicada (exata).
+- **Verificação:** `warpPerspective(img1, H)` comparado com a imagem gerada dá um erro médio de
+  0,0–0,34 níveis de cinzento (rotação e ampliação) e ≤ 2,3 níveis na redução (diferença entre a
+  suavização do `INTER_AREA` e a interpolação linear, não um erro geométrico).
+- **Correção feita:** a 1.ª versão usava fundos com cinzentos ligeiramente diferentes na máscara e
+  na rotação, o que criava arestas ténues nos cantos da imagem rodada. Passou a usar-se um único
+  valor de fundo.
+- **Resultados preliminares (só para validar o teste; repetir na corrida oficial):** coerentes com
+  a teoria. FAST+BRIEF: precisão 0,88 a 15°, 0,17 a 30° e 0 a partir de 45° (BRIEF sem orientação).
+  FAST+BRIEF/BRISK/FREAK: 0,02–0,14 a 0,5× e a 2× (FAST sem escala). SIFT e KAZE ≥ 0,79 em todos os
+  níveis. ORB 0,87–0,89 com rotações > 135°.
+- **Limitações a referir:** é uma única imagem (planar, textura de graffiti); não há ruído nem
+  mudança de iluminação; a média por categoria depende dos níveis escolhidos (por isso as curvas por
+  nível são o resultado principal).
 
 ## Ambiente e repositório
 
@@ -239,5 +291,7 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
   limiares no config.
 - **P06 (2026-10-08)** — **Pipelines aprendidos por registar** em `methods.py` (SuperPoint+NN,
   SuperPoint+LightGlue, SIFT+LightGlue): depende de `learned.py` (Pessoa B).
-- **P07 (2026-10-08)** — `main.py`: só existe `--part1`. Faltam `--fast` e `--brief` (Pessoa A,
-  próximos) e `--part2` (Pessoa B).
+- **P07 (2026-10-08)** — `main.py`: existem `--part1`, `--rotscale` e `--robustness`. Faltam
+  `--fast` e `--brief` (Pessoa A, próximos) e `--part2` (Pessoa B).
+- **P08 (2026-10-08)** — Análise qualitativa GRAF 1→2 e 1→4 (figuras de keypoints e de matches
+  certos/errados) por fazer: `visualization.py`.

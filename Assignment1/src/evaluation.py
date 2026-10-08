@@ -126,33 +126,33 @@ def _warm_up(pipelines: list[Pipeline], gray1, grayk, cfg: dict) -> None:
         p.match(p.extract(gray1, cfg), p.extract(grayk, cfg), cfg)
 
 
-def run_hpatches(pipelines: list[Pipeline], cfg: dict, seqs=None, out_csv: str | Path | None = None,
-                 verbose: bool = True) -> pd.DataFrame:
-    """Corre todos os pipelines em todos os pares 1->k do HPatches (D04).
+def evaluate_pairs(pipelines: list[Pipeline], pairs, cfg: dict, verbose: bool = True,
+                   n_seqs: int | None = None) -> pd.DataFrame:
+    """Avalia todos os pipelines numa sequência de ImagePair (HPatches ou sintéticos).
 
-    As features da img1 são calculadas uma vez por sequência e pipeline e reutilizadas para k = 2..6.
-    Um erro num par/pipeline não pára a corrida: fica registado na coluna "error".
-    Devolve um DataFrame com uma linha por (pipeline, seq, k); grava em out_csv se dado.
+    As features da img1 são calculadas uma vez por `seq` e pipeline e reutilizadas nos pares seguintes
+    da mesma `seq` (os pares de uma seq têm de vir seguidos). Antes de medir, cada pipeline corre uma
+    vez sem medir (D06). Um erro num par/pipeline não pára a corrida: fica na coluna "error".
+    Pares com `control=True` (atributo opcional) são marcados na coluna "control" (D20).
+    Devolve um DataFrame com uma linha por (pipeline, par).
     """
-    root = cfg["paths"]["hpatches"]
-    cats = tuple(cfg["eval"]["categories"])
-    ks = tuple(cfg["eval"]["pairs_k"])
-    seq_list = list_sequences(root, cats, seqs)
-    rows, cache_seq, cache_f1 = [], None, {}
+    rows, cache_seq, cache_f1, n_seen = [], None, {}, 0
     t_start = time.perf_counter()
     warmed = False
 
-    for pr in iter_hpatches_pairs(root, cats, seqs, ks):
+    for pr in pairs:
         if not warmed:
             _warm_up(pipelines, pr.gray1, pr.grayk, cfg)
             warmed = True
         if pr.seq != cache_seq:
             cache_seq, cache_f1 = pr.seq, {}
+            n_seen += 1
             if verbose:
-                i = seq_list.index(pr.seq) + 1
-                print(f"[{i:3d}/{len(seq_list)}] {pr.seq}  ({time.perf_counter() - t_start:6.0f} s)", flush=True)
+                total = f"/{n_seqs}" if n_seqs else ""
+                print(f"[{n_seen:3d}{total}] {pr.seq}  ({time.perf_counter() - t_start:6.0f} s)", flush=True)
         for p in pipelines:
-            base = {"pipeline": p.name, "seq": pr.seq, "category": pr.category, "k": pr.k}
+            base = {"pipeline": p.name, "seq": pr.seq, "category": pr.category, "k": pr.k,
+                    "control": bool(getattr(pr, "control", False))}
             try:
                 if p.name not in cache_f1:
                     cache_f1[p.name] = p.extract(pr.gray1, cfg)
@@ -165,8 +165,18 @@ def run_hpatches(pipelines: list[Pipeline], cfg: dict, seqs=None, out_csv: str |
                 rows.append(base | {"error": f"{type(e).__name__}: {e}"})
                 if verbose:
                     print(f"   ERRO {p.name} {pr.seq} 1->{pr.k}: {e}", flush=True)
+    return pd.DataFrame(rows)
 
-    df = pd.DataFrame(rows)
+
+def run_hpatches(pipelines: list[Pipeline], cfg: dict, seqs=None, out_csv: str | Path | None = None,
+                 verbose: bool = True) -> pd.DataFrame:
+    """Corre todos os pipelines em todos os pares 1->k do HPatches (D04).
+    Devolve um DataFrame com uma linha por (pipeline, seq, k); grava em out_csv se dado."""
+    root = cfg["paths"]["hpatches"]
+    cats = tuple(cfg["eval"]["categories"])
+    ks = tuple(cfg["eval"]["pairs_k"])
+    n_seqs = len(list_sequences(root, cats, seqs))
+    df = evaluate_pairs(pipelines, iter_hpatches_pairs(root, cats, seqs, ks), cfg, verbose, n_seqs)
     if out_csv is not None:
         Path(out_csv).parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(out_csv, index=False)
@@ -182,13 +192,17 @@ _MATCH_COLS = ["PMR", "precision", "matching_score", "recall"]
 def summarize(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Agrega o CSV por pares em tabelas (D18: média por par, "macro"; contagens também em média).
 
+    Categorias: 'i', 'v' (HPatches), 'rot', 'scale' (sintético, D20). Os pares de controlo
+    (0°, escala 1.0) entram só em F1_by_k, não nas médias por categoria.
+
     T1_detection   pipeline x categoria: nº kps, nº correspondências GT, repetibilidade
     T2_matching    pipeline x categoria: contagens (denominadores) + PMR, precision, MS, recall
     T5_cost        pipeline: tempos (ms), dimensão, bytes/descritor, memória
-    F1_by_k        pipeline x categoria x k: precision e MS (degradação com a dificuldade)
+    F1_by_k        pipeline x categoria x k (k = par HPatches ou nível sintético): precision e MS
     errors         linhas com erro (deve estar vazia)
     """
-    ok = df[df["error"] == ""]
+    ok_all = df[df["error"] == ""]
+    ok = ok_all[~ok_all["control"].astype(bool)] if "control" in ok_all else ok_all
     g = ok.groupby(["pipeline", "category"])
     t1 = g[["N_kps1", "N_vis1", "N_corresp", "repeatability"]].mean()
     t2 = g[_COUNT_COLS + _MATCH_COLS].mean()
@@ -196,7 +210,7 @@ def summarize(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     t5 = ok.groupby("pipeline")[["t_det_ms", "t_desc_ms", "t_match_ms", "t_total_ms",
                                  "desc_dim", "desc_bytes_per_kp", "desc_mem_kb"]].mean()
     t5["joint_timing"] = ok.groupby("pipeline")["joint_timing"].any()
-    f1 = ok.groupby(["pipeline", "category", "k"])[["precision", "matching_score"]].mean()
+    f1 = ok_all.groupby(["pipeline", "category", "k"])[["precision", "matching_score", "repeatability"]].mean()
     errors = df[df["error"] != ""]
     return {"T1_detection": t1, "T2_matching": t2, "T5_cost": t5, "F1_by_k": f1, "errors": errors}
 

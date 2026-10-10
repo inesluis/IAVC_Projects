@@ -20,6 +20,8 @@ from config import get_config, setup_env
 from datasets import load_graf_pairs
 from evaluation import evaluate_pairs, run_hpatches, save_tables, summarize
 from methods import get_pipelines
+from studies.fast_study import plot_fast, run_fast_study, summarize_fast
+from studies.fast_study import write_captions as write_fast_captions
 from studies.qualitative import run_qualitative
 from studies.rot_scale_study import run_rot_scale
 
@@ -65,6 +67,27 @@ def run_graf(args) -> None:
     print(t.round(3).to_string())
 
 
+def run_fast(args) -> None:
+    """Estudo do FAST (D24) -> <tag>_fast_raw.csv, <tag>_fast_T6.csv, figuras em results/figures/fast_study/."""
+    cfg = _cfg_from_args(args)
+    prefix = _prefix(args.tag) + "fast_"
+    raw = cfg["paths"]["tables"] / f"{prefix}raw.csv"
+    if args.reuse_raw and raw.exists():        # só refaz a tabela e as figuras (a corrida demora ~7 min)
+        df = pd.read_csv(raw)
+        df["nms"] = df["nms"].map({"True": True, "False": False, True: True, False: False})
+        print("reutilizado:", raw.name)
+    else:
+        df = run_fast_study(cfg, seqs=args.seqs)
+        df.to_csv(raw, index=False)
+    t6 = summarize_fast(df)
+    t6.to_csv(cfg["paths"]["tables"] / f"{prefix}T6.csv", float_format="%.4f")
+    print(t6.round(3).to_string())
+    fig_dir = cfg["paths"]["figures"] / "fast_study"
+    entries = plot_fast(df, cfg, fig_dir)
+    write_fast_captions(entries, fig_dir / "legendas.md")
+    print("figuras:", fig_dir)
+
+
 def run_robustness(args) -> None:
     """Junta <tag>_raw.csv (HPatches) e <tag>_rotscale_raw.csv numa tabela pipeline x {i, v, rot, scale}."""
     tables_dir = get_config()["paths"]["tables"]
@@ -103,12 +126,15 @@ def main() -> None:
     ap.add_argument("--robustness", action="store_true", help="tabela i/v/rot/scale a partir dos CSV")
     ap.add_argument("--qualitative", action="store_true", help="figuras de keypoints e matches (GRAF, sintético)")
     ap.add_argument("--graf", action="store_true", help="métricas nos pares GRAF 1->2 e 1->3")
+    ap.add_argument("--fast", action="store_true", help="estudo do FAST (threshold x NMS vs SIFT)")
     ap.add_argument("--pipelines", nargs="+", default=None, help="subconjunto de pipelines (omissão: todos)")
     ap.add_argument("--seqs", nargs="+", default=None, help="subconjunto de sequências (omissão: todas)")
     ap.add_argument("--max-kps", default=get_config()["max_keypoints"], help="orçamento de keypoints ou 'none'")
     ap.add_argument("--tag", default="", help="prefixo dos ficheiros de resultados")
+    ap.add_argument("--reuse-raw", action="store_true",
+                    help="--fast: reutiliza <tag>_fast_raw.csv se existir (não repete a corrida)")
     args = ap.parse_args()
-    if not (args.part1 or args.rotscale or args.robustness or args.qualitative or args.graf):
+    if not (args.part1 or args.rotscale or args.robustness or args.qualitative or args.graf or args.fast):
         ap.print_help()
         return
     if args.part1:
@@ -117,6 +143,8 @@ def main() -> None:
         run_rotscale(args)
     if args.graf:
         run_graf(args)
+    if args.fast:
+        run_fast(args)
     if args.robustness:
         run_robustness(args)
     if args.qualitative:

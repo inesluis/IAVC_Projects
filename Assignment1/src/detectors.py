@@ -33,7 +33,9 @@ def create_detector(name: str, cfg: dict):
 
 def cap_keypoints(kps, n_max: int | None) -> list[cv2.KeyPoint]:
     """Mantém os n_max keypoints com maior resposta (D05). Ordenação estável -> determinística.
-    n_max = None mantém todos."""
+    n_max = None mantém todos.
+    ATENÇÃO (D24): o FAST com NMS desligada devolve response = 0 em todos os pontos; aí o corte guardaria
+    só os primeiros pela ordem de varrimento (linhas de cima). Usar o FAST com NMS ligada quando há limite."""
     kps = list(kps)
     if n_max is None or len(kps) <= n_max:
         return kps

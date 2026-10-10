@@ -8,6 +8,32 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 
 ---
 
+## Decisões importantes / fora do comum (rever se necessário)
+
+Lista das escolhas que **não vêm diretamente do enunciado** ou que **se desviam do procedimento mais
+óbvio**. Cada uma pode mudar os números do relatório. Para cada uma: o que foi feito, porquê, e
+**como voltar atrás**. Os detalhes estão na entrada `Dxx` indicada.
+
+| # | Decisão fora do comum | Porquê | Como voltar atrás | Ver |
+|---|---|---|---|---|
+| 1 | **Estudo do FAST: threshold 5 excluído** (usam-se 10, 20, 40, 80) | Com t=5 o FAST marca ~15% dos píxeis; são os pontos de menor confiança (orientação do professor: descartá-los), a repetibilidade é quase toda ao acaso e o cálculo bloqueia | Acrescentar `5` a `CFG["fast_study"]["thresholds"]` | D24 |
+| 2 | **Estudo do FAST: repetibilidade não calculada acima de 50 000 pontos por imagem** | O emparelhamento 1-para-1 bloqueou (> 14 min) com 160 mil pontos num só par | Mudar `CFG["fast_study"]["max_points_repeatability"]` (risco de bloquear) | D24 |
+| 3 | **Estudo do FAST: repetibilidade média só nos pares comuns a todas as configurações** (188 de 285 em `i`; 113 de 295 em `v`) | Por causa do ponto 2, cada configuração ficava avaliada em pares diferentes e as médias não eram comparáveis | Em `fast_study.summarize_fast` e `plot_fast`, usar `df` em vez de `common_pairs(df)` | D24 |
+| 4 | **Estudo do FAST: "repetibilidade ao acaso"** medida com a H ground-truth deslocada 20 px | Com muitos pontos a repetibilidade sobe por coincidência; é preciso um nível de referência | Remover a coluna `repeatability_chance`; os deslocamentos estão em `CFG["fast_study"]["chance_shifts_px"]` | D24 |
+| 5 | **Rotação e escala avaliadas num teste sintético** (GRAF imagem 1 rodada/escalada), não no HPatches | O HPatches só separa iluminação e ponto de vista; o professor pediu a discussão das 4 categorias | Não correr `--rotscale`; níveis em `CFG["synthetic"]` | D19, D20 |
+| 6 | **Controlos (0° e escala 1,0) fora das médias** de rotação/escala | São triviais (precisão 1,0) e inflacionariam a média | Em `evaluation.summarize`, não filtrar a coluna `control` | D20 |
+| 7 | **Máscara circular na imagem do teste de rotação** | Sem ela, rodar cria cantos pretos e perde conteúdo, o que gera keypoints falsos | `rot_scale_study.make_pairs`: não aplicar `circular_feather` | D20 |
+| 8 | **GRAF `img4.ppm` chama-se "Imagem 3"** nas figuras, legendas e tabelas | Só há 3 imagens GRAF; numeração 1, 2, 3 no relatório (pedido da Carolina) | `datasets.GRAF_REPORT_NUMBER = {2: 2, 4: 4}` | D21 |
+| 9 | **Correspondências ground-truth por emparelhamento 1-para-1 máximo** (não o método guloso do código de arranque) | Garante N_correct ≤ N_corresp e recall ≤ 1 | Trocar o cálculo em `evaluation.gt_correspondences` | D17 |
+| 10 | **Limite de 2000 keypoints por imagem** nas experiências principais (maior confiança primeiro) | Comparação justa entre métodos; o enunciado avisa que mais pontos não significa melhor | `--max-kps none` ou `CFG["max_keypoints"] = None` | D05 |
+| 11 | **Precisão = 0 quando não há matches** (em vez de "não definida") | Um método que não emparelha nada falhou nesse par; ignorar o par inflacionaria a média | `evaluation.evaluate_pair`: devolver NaN | D18 |
+| 12 | **N_features conta todos os keypoints da imagem 1** (não só os da zona comum) | Definição literal de PMR e matching score; o enunciado deixa a escolha aos alunos | `evaluation.evaluate_pair`: usar `N_vis1` | D02 |
+| 13 | **Deteção e descrição em chamadas separadas** para medir os dois tempos | O enunciado pede tempos separados; no SIFT/KAZE a soma fica maior do que um `detectAndCompute` | `descriptors.extract_classic` | D06 |
+| 14 | **Keypoints nas figuras com marcador fixo** (sem escala nem orientação) e **amostra de 150 linhas** nos matches | Os círculos à escala do ORB tapavam a imagem; com todas as linhas não se via nada | `visualization.plot_keypoints`; `CFG["qualitative"]["max_matches_drawn"]` | D21 |
+| 15 | **Métricas da homografia (T4) ainda não existem** | Dependem do `homography.py` da Inês; decidido não implementar nada sobre código por fazer | Implementar quando existir | P05 |
+
+---
+
 ## Protocolo e interface
 
 ### D01 — Interface comum entre módulos
@@ -66,6 +92,10 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 - **Alternativa:** usar o `nfeatures` de cada método. Só existe no SIFT e no ORB, por isso o corte é
   feito por nós, de forma igual para todos (exceção: ORB, ver D10).
 - **Possível extra:** repetir a experiência sem limite e discutir a diferença.
+- **Cuidado (verificado em 2026-10-09, D24):** o FAST com NMS **desligada** devolve `response = 0` em
+  todos os pontos. Aí o corte guardaria só os primeiros pontos pela ordem de varrimento (as linhas de
+  cima da imagem). Nas experiências principais o FAST usa sempre NMS ligada, por isso os resultados
+  não são afetados; fica o aviso no código (`detectors.cap_keypoints`).
 
 ### D06 — Medição de tempos
 - **Estado:** Implementada (incluindo o aquecimento, `evaluation._warm_up`)
@@ -173,7 +203,9 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
   N_correct ≤ N_corresp em todas as linhas.
 - **Limitação a referir:** a repetibilidade é calculada com os keypoints depois do `compute()`, por
   isso FAST+BRIEF/BRISK/FREAK têm valores ligeiramente diferentes (cada descritor remove pontos
-  diferentes da borda). A repetibilidade "pura" do detetor FAST é medida no estudo do FAST (T6).
+  diferentes da borda). A repetibilidade "pura" do detetor FAST é medida no estudo do FAST (T6, D24).
+- **Implementação (desde D24):** os pares a < 3 px são encontrados com uma KD-tree, não com uma matriz
+  densa. O resultado é idêntico (verificado).
 
 ### D18 — Casos limite e agregação
 - **Estado:** Implementada (`evaluation.evaluate_pair`, `evaluation.summarize`)
@@ -315,6 +347,150 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
     os mesmos pontos; o que falha é o descritor, porque a perspetiva forte deforma a vizinhança de
     cada ponto. Exemplo claro para separar o desempenho do detetor do desempenho do descritor.
 
+### D24 — Estudo do detetor FAST (threshold × NMS, comparação com SIFT)
+- **Estado:** Implementada (`studies/fast_study.py`, `CFG["fast_study"]`, `main.py --fast`)
+- **Pedido:** enunciado §2.3: "investigate the effect of detector parameters, such as the intensity
+  threshold and non-maximum suppression, and compare FAST against SIFT in terms of repeatability,
+  number of detected points and runtime".
+- **Desenho:**
+  - Configurações: threshold ∈ {10, 20, 40, 80} × NMS {ligada, desligada}, tipo 9/16 → 8
+    configurações do FAST, mais o SIFT com os parâmetros por omissão como referência. (O t=5 foi
+    excluído em 2026-10-09; ver "Confiança dos keypoints" abaixo.)
+  - Dados: HPatches completo (580 pares 1→k), separado por `i` e `v`.
+  - Só o **detetor**: sem descritor, por isso a repetibilidade não é afetada pelo `compute()` (resolve
+    a limitação da D17).
+  - **Sem limite de pontos** (`max_keypoints=None`) em todas as configurações e no SIFT: o objetivo é
+    ver o comportamento real do detetor, incluindo a explosão do nº de pontos com threshold baixo.
+  - Métricas por par: nº de pontos (média img1/imgk), pontos na zona comum, correspondências GT
+    (D17), repetibilidade, **repetibilidade ao acaso** e tempo de deteção por imagem (média img1/imgk,
+    com aquecimento, D06).
+- **Repetibilidade ao acaso (porquê e como):** com muitos pontos, quase todos têm um vizinho a < 3 px
+  por coincidência, e a repetibilidade sobe sem mérito do detetor. Exemplo: FAST t=5 sem NMS em
+  `v_graffiti` 1→2 teve 64 mil / 68 mil pontos e repetibilidade 0,93. Para separar o efeito real do
+  acaso, calcula-se a mesma medida com a H ground-truth **deslocada 20 px** (média de (+20, +20) e
+  (−20, −20) px): mantém o nº e a distribuição real dos pontos, mas quebra a correspondência geométrica.
+  - Alternativa rejeitada: a fórmula para pontos uniformes, 1 − exp(−π·ε²·densidade). No teste dava
+    valores **acima** da repetibilidade medida no FAST sem NMS (ex.: 0,92 ao acaso vs 0,62 medida em `i`,
+    t=5). Os pontos sem NMS formam aglomerados, que cobrem muito menos área do que pontos uniformes, por
+    isso a fórmula sobrestima o acaso.
+  - Limitação: 20 px é uma escolha (≫ 3 px, mas ainda dentro da zona com textura). É uma estimativa
+    do nível ao acaso, não um valor exato.
+- **Alteração de suporte:** `evaluation.gt_correspondences` passou a usar uma KD-tree
+  (`scipy.spatial.cKDTree.sparse_distance_matrix`) em vez da matriz de distâncias densa. A densa,
+  com 64 mil × 68 mil pontos, precisaria de ~35 GB. Verificado: N_corresp idêntico à versão densa em
+  100 casos (5 sequências × 5 pares × 4 métodos); 64 mil pontos em 0,2 s.
+- **Saídas:** `<tag>_fast_raw.csv` (uma linha por configuração × par), `<tag>_fast_T6.csv` (tabela T6:
+  configuração × categoria), figuras `results/figures/fast_study/fast_<métrica>_<i|v>.png`
+  (repetibilidade, nº de pontos, tempo; uma por métrica e categoria) e `legendas.md`.
+
+#### Incidente (2026-10-08/09): a corrida bloqueou na sequência 2
+- **Sintoma:** a 1.ª corrida completa ficou mais de 14 min parada em `i_autannes` (2.ª sequência),
+  a consumir CPU.
+- **Diagnóstico:**
+  - a KD-tree e o emparelhamento eram rápidos nos pares 1→2 … 1→5 (≤ 0,3 s, mesmo com 160 mil pontos);
+  - o bloqueio estava no par **1→6**, configuração **t=5 sem NMS**: 160 mil × 163 mil pontos e
+    1,05 milhões de ligações (pares a < 3 px). O `maximum_bipartite_matching` do scipy (Hopcroft–Karp)
+    não terminou em 4 min;
+  - causa: os pontos estão tão densos que as ligações se encadeiam pela imagem toda, e **264 mil dos
+    323 mil pontos formam um único grupo ligado** (componente). Por isso dividir o grafo em
+    componentes também não ajuda.
+- **Ordem de grandeza:** 160 mil keypoints numa imagem de 870×1280 são ~15% de todos os píxeis. Já
+  não são pontos de interesse.
+
+#### Confiança dos keypoints e exclusão do t=5
+- **Teoria:** cada keypoint tem um score de confiança (`KeyPoint.response`). No FAST, o score é o
+  **maior threshold para o qual o píxel ainda seria detetado**, isto é, quanto o arco de 9 píxeis
+  contíguos do círculo é mais claro/escuro do que o centro. Pontos de score baixo estão mesmo no
+  limiar: pouco repetíveis (ruído, luz e perspetiva fazem-nos desaparecer), pouco distintivos e
+  redundantes.
+- **Orientação do professor:** os pontos de baixa confiança podem ser descartados, porque acrescentam
+  pouco.
+- **No FAST, descartar por confiança = subir o threshold:** um ponto com score s é detetado para
+  qualquer t ≤ s, por isso "FAST t=20" = "FAST t=5, guardando só os pontos com confiança ≥ 20". A
+  **NMS** é outra forma de usar a confiança: em cada grupo de vizinhos fica só o de score máximo.
+- **Verificado (GRAF img1):** com NMS ligada, `response` vai do threshold até 195 (t=5: mínimo 5,
+  mediana 14; t=20: mínimo 20, mediana 37). Com **NMS desligada, `response = 0` em todos os pontos**: o OpenCV só calcula o
+  score quando precisa dele para a supressão. Sem NMS não há confiança para ordenar ou filtrar; o
+  único filtro é o próprio threshold.
+- **Decisão:** excluir o t=5. É o corte de confiança mais baixo, marca ~15% dos píxeis como "cantos",
+  a sua repetibilidade é quase toda ao acaso (no teste: 0,93 medida contra 0,88 ao acaso em `v`) e
+  torna o cálculo impraticável.
+
+#### Rede de segurança: limite de pontos para a repetibilidade
+- **Decisão:** se uma das imagens do par tiver mais de **50 000 pontos**
+  (`CFG["fast_study"]["max_points_repeatability"]`), a repetibilidade (e o nível ao acaso) desse par
+  **não é calculada**: fica NaN, a coluna `rep_skipped` = True, e é excluída da média. O nº de
+  pontos e o tempo continuam a ser medidos. A T6 mostra `n_rep_skipped` e a legenda dos gráficos de
+  repetibilidade indica quantos pares foram excluídos em cada configuração.
+- **Justificação:** garante que a corrida não bloqueia em nenhuma configuração/par extremo, sem ter de
+  adivinhar quais. 50 mil pontos por imagem é muito acima do útil (o SIFT dá ~3–4 mil).
+- **Teste:** `i_autannes` + `v_graffiti` correm em 6 s. Em `i_autannes`, o t=10 sem NMS (~82 mil
+  pontos/imagem) ficou com os 5 pares excluídos e o t=20 sem NMS com 2.
+- **Consequência:** ver a subsecção seguinte.
+
+#### Médias comparáveis: só os pares comuns a todas as configurações (2026-10-10)
+- **Problema (corrida completa de 2026-10-09):** a rede de segurança excluiu muito mais pares nas
+  configurações que geram mais pontos:
+
+  | Configuração | pares excluídos em `i` (de 285) | em `v` (de 295) |
+  |---|---|---|
+  | t=10, NMS ligada | 4 | 11 |
+  | t=20, NMS ligada | 0 | 5 |
+  | t=10, NMS desligada | 97 | 182 |
+  | t=20, NMS desligada | 41 | 86 |
+  | t=40, NMS desligada | 0 | 5 |
+  | t=40 e t=80 com NMS, t=80 sem NMS, SIFT | 0 | 0 |
+
+  Os pares excluídos não são aleatórios: são os das imagens com mais textura. Cada configuração ficava
+  com a repetibilidade média calculada num conjunto de pares diferente, e os valores não eram
+  comparáveis.
+- **Exemplo para perceber:** é como comparar a média de dois alunos quando um fez os 10 testes e o
+  outro faltou aos 4 mais difíceis. A média do segundo não diz que ele é melhor.
+- **Decisão:** a repetibilidade (medida e ao acaso) é a média só sobre os **pares em que todas as
+  configurações, incluindo o SIFT, foram avaliadas**: 188 de 285 em `i` e 113 de 295 em `v`
+  (`fast_study.common_pairs`). O nº de pontos e o tempo continuam a ser médias sobre os 580 pares,
+  porque essas medidas existem sempre.
+- **Na T6:** `n_pairs` (todos), `n_pairs_rep` (comuns) e `n_rep_skipped` (excluídos nessa configuração).
+  As legendas dos gráficos de repetibilidade dizem quantos pares entram na média.
+- **Alternativas rejeitadas:**
+  - manter as médias sobre pares diferentes e só indicar os excluídos: comparação injusta;
+  - excluir também o t=10 sem NMS: mais uma exclusão, e o t=20 sem NMS continuava com o problema;
+  - subir o limite de pontos: o bloqueio ocorreu com 160 mil, não se sabe a partir de onde é seguro.
+- **Limitação a referir no relatório:** a repetibilidade do estudo do FAST não inclui as imagens com
+  mais textura (ex.: `i_autannes`), sobretudo em `v` (113 de 295 pares). As conclusões valem para
+  esse subconjunto.
+- **Como refazer sem repetir a corrida:** `python src/main.py --fast --tag classic --reuse-raw`
+  (lê `classic_fast_raw.csv` e refaz a T6, as figuras e as legendas).
+
+#### Resultados (corrida de 2026-10-09: 116 sequências, 407 s; médias refeitas em 2026-10-10)
+
+| Configuração | pontos/img `i` | pontos/img `v` | t_det `i` (ms) | t_det `v` (ms) | rep. `i` (acaso) | rep. `v` (acaso) |
+|---|---|---|---|---|---|---|
+| FAST t=10, NMS ligada | 11 971 | 18 984 | 2,2 | 3,6 | 0,67 (0,36) | 0,70 (0,38) |
+| FAST t=20, NMS ligada | 5 675 | 9 527 | 1,2 | 2,1 | 0,64 (0,23) | 0,66 (0,20) |
+| FAST t=40, NMS ligada | 2 038 | 3 745 | 0,6 | 1,0 | 0,61 (0,13) | 0,66 (0,09) |
+| FAST t=80, NMS ligada | 485 | 885 | 0,3 | 0,5 | 0,53 (0,05) | 0,60 (0,05) |
+| FAST t=10, NMS desligada | 45 877 | 75 744 | 2,5 | 4,2 | 0,78 (0,39) | 0,80 (0,39) |
+| FAST t=20, NMS desligada | 19 181 | 32 906 | 1,2 | 2,2 | 0,72 (0,25) | 0,75 (0,20) |
+| FAST t=40, NMS desligada | 6 107 | 10 736 | 0,6 | 1,0 | 0,65 (0,14) | 0,70 (0,10) |
+| FAST t=80, NMS desligada | 1 232 | 2 112 | 0,3 | 0,4 | 0,54 (0,05) | 0,62 (0,05) |
+| SIFT (referência) | 3 425 | 6 196 | 77,7 | 100,6 | 0,47 (0,14) | 0,52 (0,15) |
+
+Pontos e tempo: 285 pares `i`, 295 pares `v`. Repetibilidade: 188 pares `i`, 113 pares `v` (comuns).
+
+- **Observações para o relatório:**
+  - **Threshold:** subir o threshold reduz muito o nº de pontos (21–25× de t=10 para t=80, com NMS) e
+    reduz pouco a repetibilidade (0,67 → 0,53 em `i`). O nível ao acaso cai muito mais (0,36 → 0,05):
+    com threshold alto, a repetibilidade que sobra é quase toda real.
+  - **NMS:** desligá-la dá 2,5–4× mais pontos e mais 0,04–0,12 de repetibilidade em t ≤ 40, mas os
+    pontos a mais são vizinhos redundantes dos mesmos cantos. Com t=80 a diferença quase desaparece
+    (0,53 vs 0,54 em `i`; 0,60 vs 0,62 em `v`). Sem NMS os pontos não têm score de confiança.
+  - **FAST vs SIFT:** o FAST é 24–270× mais rápido (0,3–4,2 ms contra 78–101 ms por imagem). Com um nº
+    de pontos da mesma ordem (t=40 com NMS: 2–4 mil; SIFT: 3–6 mil), o FAST tem repetibilidade mais
+    alta nos dois casos (0,61 vs 0,47 em `i`; 0,66 vs 0,52 em `v`), com nível ao acaso semelhante
+    (0,09–0,13 vs 0,14–0,15). Ressalva: o SIFT deteta em várias escalas e a repetibilidade aqui só
+    mede a posição (3 px); a invariância à escala do SIFT não é avaliada neste estudo (ver D20).
+
 ## Ambiente e repositório
 
 ### D13 — Ambiente Python
@@ -367,7 +543,7 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
   limiares no config.
 - **P06 (2026-10-08)** — **Pipelines aprendidos por registar** em `methods.py` (SuperPoint+NN,
   SuperPoint+LightGlue, SIFT+LightGlue): depende de `learned.py` (Pessoa B).
-- **P07 (2026-10-08)** — `main.py`: existem `--part1`, `--rotscale`, `--robustness` e `--qualitative`. Faltam
-  `--fast` e `--brief` (Pessoa A, próximos) e `--part2` (Pessoa B).
+- **P07 (2026-10-08)** — `main.py`: existem `--part1`, `--rotscale`, `--robustness`, `--qualitative`,
+  `--graf` e `--fast`. Faltam `--brief` (Pessoa A) e `--part2` (Pessoa B).
 - **P08 (2026-10-08)** — ~~Análise qualitativa GRAF~~ feita (D21). Falta decidir se as figuras
   (30 JPEG, ≈ 13 MB) vão para o git ou se se geram só para a entrega.

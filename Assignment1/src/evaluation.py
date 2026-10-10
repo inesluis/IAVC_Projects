@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import maximum_bipartite_matching
+from scipy.spatial import cKDTree
 
 from datasets import iter_hpatches_pairs, list_sequences
 from interface import Features, MatchResult, Pipeline
@@ -65,8 +66,10 @@ def gt_correspondences(p1: np.ndarray, pk: np.ndarray, H: np.ndarray, shape1, sh
     n1, nk = len(a), len(b)
     if n1 == 0 or nk == 0:
         return 0, n1, nk
-    d = np.linalg.norm(a[:, None, :] - b[None, :, :], axis=2)   # (n1, nk), <= 2000x2000
-    rows, cols = np.nonzero(d < eps)
+    # pares a < eps via KD-tree (D24): memória ~ nº de pares próximos, não n1*nk
+    near = cKDTree(a).sparse_distance_matrix(cKDTree(b), eps, output_type="ndarray")
+    near = near[near["v"] < eps]                                   # estritamente < eps
+    rows, cols = near["i"], near["j"]
     if len(rows) == 0:
         return 0, n1, nk
     graph = csr_matrix((np.ones(len(rows), dtype=np.int8), (rows, cols)), shape=(n1, nk))

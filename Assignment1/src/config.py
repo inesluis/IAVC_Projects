@@ -41,6 +41,15 @@ CFG = {
         "mask_feather_px": 10,    # largura da transição suave da máscara circular (rotação)
     },
 
+    # ---- Estudo do FAST (enunciado §2.3, D24) ----
+    "fast_study": {
+        "thresholds": [10, 20, 40, 80],   # D24: t=5 excluído (pontos de confiança mínima, ~15% dos píxeis)
+        "nms": [True, False],
+        "reference": "SIFT",      # detetor de referência na comparação
+        "chance_shifts_px": [(20, 20), (-20, -20)],   # deslocamentos da H GT para o nível ao acaso
+        "max_points_repeatability": 50_000,   # D24: acima disto (por imagem) a repetibilidade não é calculada
+    },
+
     # ---- Figuras qualitativas (D21) ----
     "qualitative": {
         "max_matches_drawn": 150,      # amostra aleatória (seed fixa) mantendo a proporção certo/errado

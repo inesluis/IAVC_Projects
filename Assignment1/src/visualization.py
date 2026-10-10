@@ -4,6 +4,7 @@ Figuras matplotlib com eixos em píxeis e identificação de cada imagem (D21):
   plot_keypoints  — posição dos keypoints numa imagem, marcador igual para todos os métodos
   plot_matches    — duas imagens lado a lado; linhas verdes/vermelhas segundo uma máscara booleana
                     (matches corretos vs errados com a H GT, ou inliers vs outliers do RANSAC)
+  plot_curves     — gráfico de linhas (estudos de parâmetros, curvas por nível)
   save_figure     — grava (PNG ou JPEG pela extensão) e fecha a figura
 """
 
@@ -17,6 +18,7 @@ matplotlib.use("Agg")            # sem janelas: só gravar ficheiros
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 from matplotlib.patches import ConnectionPatch  # noqa: E402
+from matplotlib.ticker import NullLocator  # noqa: E402
 
 from interface import Features  # noqa: E402
 
@@ -91,6 +93,32 @@ def plot_matches(img1: np.ndarray, img2: np.ndarray, f1: Features, f2: Features,
     fig.legend(handles=handles, loc="outside lower center", ncol=len(handles), fontsize=10, frameon=False)
     fig.suptitle(title, fontsize=12)
     return fig, len(idx)
+
+
+def plot_curves(series: list[dict], xlabel: str, ylabel: str, title: str, hlines: list[dict] = (),
+                logx: bool = False, logy: bool = False, xticks=None):
+    """Gráfico de linhas. series: [{"x", "y", "label", "style"(opcional, ex. "-o"), "color"(opcional)}];
+    hlines: [{"y", "label"}] linhas horizontais de referência (pontilhado preto)."""
+    fig, ax = plt.subplots(figsize=(7, 4.6), layout="constrained")
+    for s in series:
+        ax.plot(s["x"], s["y"], s.get("style", "-o"), label=s["label"], color=s.get("color"),
+                linewidth=1.6, markersize=5)
+    for h in hlines:
+        ax.axhline(h["y"], color="black", linestyle=(0, (1, 2)), linewidth=1.4, label=h["label"])
+    if logx:
+        ax.set_xscale("log")
+    if logy:
+        ax.set_yscale("log")
+    if xticks is not None:
+        ax.set_xticks(xticks)
+        ax.set_xticklabels([f"{v:g}" for v in xticks])
+        ax.xaxis.set_minor_locator(NullLocator())     # só os ticks pedidos no eixo x
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title, fontsize=11)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    return fig
 
 
 def save_figure(fig, path: str | Path, dpi: int = 150, jpeg_quality: int = 92) -> Path:

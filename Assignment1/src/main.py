@@ -20,6 +20,8 @@ from config import get_config, setup_env
 from datasets import load_graf_pairs
 from evaluation import evaluate_pairs, run_hpatches, save_tables, summarize
 from methods import get_pipelines
+from studies.brief_study import BRIEF_STUDY_PIPELINES, plot_patterns
+from studies.brief_study import write_captions as write_brief_captions
 from studies.fast_study import plot_fast, run_fast_study, summarize_fast
 from studies.fast_study import write_captions as write_fast_captions
 from studies.qualitative import run_qualitative
@@ -97,12 +99,36 @@ def run_robustness(args) -> None:
                    ignore_index=True)
     df["error"] = df["error"].fillna("")
     df["control"] = df["control"].fillna(False).astype(bool)
-    tables = summarize(df)
-    rob = tables["T2_matching"][["PMR", "precision", "matching_score", "recall"]].join(
-        tables["T1_detection"][["repeatability"]]).unstack("category")
-    rob = rob.reindex(columns=["i", "v", "rot", "scale"], level=1)
+    rob = _robustness_table(summarize(df))
     rob.to_csv(tables_dir / f"{p}robustness.csv", float_format="%.4f")
     print(rob.round(3).to_string())
+
+
+def _robustness_table(tables: dict) -> pd.DataFrame:
+    """pipeline x {i, v, rot, scale}: PMR, precision, matching score, recall, repetibilidade (D19)."""
+    rob = tables["T2_matching"][["PMR", "precision", "matching_score", "recall"]].join(
+        tables["T1_detection"][["repeatability"]]).unstack("category")
+    return rob.reindex(columns=["i", "v", "rot", "scale"], level=1)
+
+
+def run_brief(args) -> None:
+    """Estudo do BRIEF próprio (D25): FAST + BRIEF OpenCV vs FAST + BRIEF próprio (G I, II, III, V) nas
+    4 categorias -> <tag>_brief_raw.csv, <tag>_brief_T7.csv (+ T2, T5, F1) e figuras dos padrões."""
+    cfg = _cfg_from_args(args)
+    prefix = _prefix(args.tag) + "brief_"
+    tables_dir = cfg["paths"]["tables"]
+    pipelines = get_pipelines(BRIEF_STUDY_PIPELINES)
+    df = pd.concat([run_hpatches(pipelines, cfg, seqs=args.seqs), run_rot_scale(pipelines, cfg)],
+                   ignore_index=True)
+    df.to_csv(tables_dir / f"{prefix}raw.csv", index=False)
+    tables = summarize(df)
+    save_tables({k: tables[k] for k in ("T2_matching", "T5_cost", "F1_by_k", "errors")}, tables_dir, prefix)
+    t7 = _robustness_table(tables).reindex(list(BRIEF_STUDY_PIPELINES))
+    t7.to_csv(tables_dir / f"{prefix}T7.csv", float_format="%.4f")
+    print(t7.round(3).to_string())
+    fig_dir = cfg["paths"]["figures"] / "brief_own"
+    write_brief_captions(plot_patterns(cfg, fig_dir), fig_dir / "legendas.md")
+    print("figuras:", fig_dir)
 
 
 def run_part1(args) -> None:
@@ -127,14 +153,17 @@ def main() -> None:
     ap.add_argument("--qualitative", action="store_true", help="figuras de keypoints e matches (GRAF, sintético)")
     ap.add_argument("--graf", action="store_true", help="métricas nos pares GRAF 1->2 e 1->3")
     ap.add_argument("--fast", action="store_true", help="estudo do FAST (threshold x NMS vs SIFT)")
-    ap.add_argument("--pipelines", nargs="+", default=None, help="subconjunto de pipelines (omissão: todos)")
+    ap.add_argument("--brief", action="store_true", help="estudo do BRIEF próprio (G I, II, III, V vs OpenCV)")
+    ap.add_argument("--pipelines", nargs="+", default=None,
+                    help="subconjunto de pipelines (omissão: as 6 configurações clássicas)")
     ap.add_argument("--seqs", nargs="+", default=None, help="subconjunto de sequências (omissão: todas)")
     ap.add_argument("--max-kps", default=get_config()["max_keypoints"], help="orçamento de keypoints ou 'none'")
     ap.add_argument("--tag", default="", help="prefixo dos ficheiros de resultados")
     ap.add_argument("--reuse-raw", action="store_true",
                     help="--fast: reutiliza <tag>_fast_raw.csv se existir (não repete a corrida)")
     args = ap.parse_args()
-    if not (args.part1 or args.rotscale or args.robustness or args.qualitative or args.graf or args.fast):
+    if not (args.part1 or args.rotscale or args.robustness or args.qualitative or args.graf or args.fast
+            or args.brief):
         ap.print_help()
         return
     if args.part1:
@@ -145,6 +174,8 @@ def main() -> None:
         run_graf(args)
     if args.fast:
         run_fast(args)
+    if args.brief:
+        run_brief(args)
     if args.robustness:
         run_robustness(args)
     if args.qualitative:

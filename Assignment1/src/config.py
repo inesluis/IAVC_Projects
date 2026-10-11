@@ -41,6 +41,15 @@ CFG = {
         "mask_feather_px": 10,    # largura da transição suave da máscara circular (rotação)
     },
 
+    # ---- BRIEF próprio (enunciado §2.5, D25; Calonder et al., ECCV 2010, secção 3) ----
+    "brief_own": {
+        "patch_size": 48,      # S: o artigo não dá valor; 48 = BRIEF do OpenCV (margem medida de 28 px)
+        "n_bits": 256,         # n_d = 256 (BRIEF-32, o descritor por omissão do artigo e do OpenCV)
+        "blur_ksize": 9,       # janela 9x9 (ECCV 2010; a versão TPAMI 2012 usa 7x7)
+        "blur_sigma": 2.0,     # "in practice, we use a value of 2"
+        "polar_radii": 8,      # G V: 8 anéis x 32 ângulos = 256 pontos (escolha nossa)
+    },
+
     # ---- Estudo do FAST (enunciado §2.3, D24) ----
     "fast_study": {
         "thresholds": [10, 20, 40, 80],   # D24: t=5 excluído (pontos de confiança mínima, ~15% dos píxeis)

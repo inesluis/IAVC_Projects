@@ -6,6 +6,8 @@ import time
 import cv2
 import numpy as np
 
+from brief_own import STRATEGIES as BRIEF_OWN_STRATEGIES
+from brief_own import BriefOwn
 from detectors import check_gray, create_detector, detect
 from interface import Features
 
@@ -18,6 +20,12 @@ DESCRIPTOR_NORM = {
     "BRISK": cv2.NORM_HAMMING,
     "FREAK": cv2.NORM_HAMMING,
 }
+# BRIEF próprio (D25): "BRIEF-GI", "BRIEF-GII", "BRIEF-GIII", "BRIEF-GV"
+_BRIEF_OWN = {f"BRIEF-{s}": s for s in BRIEF_OWN_STRATEGIES}
+DESCRIPTOR_NORM |= {name: cv2.NORM_HAMMING for name in _BRIEF_OWN}
+
+# Configurações FAST + BRIEF próprio, uma por estratégia de amostragem.
+BRIEF_OWN_COMBOS = tuple(f"FAST+{name}" for name in _BRIEF_OWN)
 
 # Descritores que só podem ser usados com o seu próprio detetor (dependem de escala/octava
 # atribuídas por esse detetor). Os restantes funcionam sobre keypoints de qualquer detetor. D11
@@ -28,9 +36,11 @@ CLASSIC_COMBOS = ("SIFT", "ORB", "KAZE", "FAST+BRIEF", "FAST+BRISK", "FAST+FREAK
 
 
 def create_descriptor(name: str, cfg: dict):
-    """Cria o objeto OpenCV que calcula o descritor `name`."""
+    """Cria o objeto que calcula o descritor `name` (OpenCV, ou BriefOwn para o BRIEF próprio)."""
     if name in ("SIFT", "ORB", "KAZE"):
         return create_detector(name, cfg)   # mesmo objeto/parâmetros que o detetor
+    if name in _BRIEF_OWN:
+        return BriefOwn(_BRIEF_OWN[name], cfg)   # os pares são gerados aqui, fora do tempo medido
     p = cfg["descriptors"].get(name, {})
     if name == "BRIEF":
         return cv2.xfeatures2d.BriefDescriptorExtractor_create(**p)

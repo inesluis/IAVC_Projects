@@ -31,6 +31,11 @@ Lista das escolhas que **não vêm diretamente do enunciado** ou que **se desvia
 | 13 | **Deteção e descrição em chamadas separadas** para medir os dois tempos | O enunciado pede tempos separados; no SIFT/KAZE a soma fica maior do que um `detectAndCompute` | `descriptors.extract_classic` | D06 |
 | 14 | **Keypoints nas figuras com marcador fixo** (sem escala nem orientação) e **amostra de 150 linhas** nos matches | Os círculos à escala do ORB tapavam a imagem; com todas as linhas não se via nada | `visualization.plot_keypoints`; `CFG["qualitative"]["max_matches_drawn"]` | D21 |
 | 15 | **Métricas da homografia (T4) ainda não existem** | Dependem do `homography.py` da Inês; decidido não implementar nada sobre código por fazer | Implementar quando existir | P05 |
+| 16 | **BRIEF próprio: patch S = 48 px** | Nenhuma das versões do artigo (ECCV 2010, TPAMI 2012) dá um valor para S; 48 é o do BRIEF do OpenCV (margem medida de 28 px) | `CFG["brief_own"]["patch_size"]` | D25 |
+| 17 | **BRIEF próprio: grelha polar da G V com 8 anéis × 32 ângulos** | O artigo só diz "coarse polar grid containing n_d points" | `CFG["brief_own"]["polar_radii"]` | D25 |
+| 18 | **BRIEF próprio: suavização gaussiana 9×9, σ = 2** (ECCV 2010) e não 7×7 ou filtro de caixa (TPAMI 2012) | Segue a versão original e coincide com o kernel 9 do OpenCV | `CFG["brief_own"]["blur_ksize"]`, `["blur_sigma"]` | D25 |
+| 19 | **BRIEF próprio: 4 estratégias (G I, II, III, V); a G IV não foi implementada** | A G IV é a menos especificada no artigo; o enunciado pede pelo menos 2 | Acrescentar "GIV" em `brief_own.make_pairs` e em `STRATEGIES` | D25 |
+| 20 | **BRIEF próprio: coordenadas fora do patch encostadas à borda também na G II** | O artigo só o diz para a G III; com σ = S/5 cerca de 1% das coordenadas cai fora | `brief_own.make_pairs` | D25 |
 
 ---
 
@@ -491,6 +496,124 @@ Pontos e tempo: 285 pares `i`, 295 pares `v`. Repetibilidade: 188 pares `i`, 113
     (0,09–0,13 vs 0,14–0,15). Ressalva: o SIFT deteta em várias escalas e a repetibilidade aqui só
     mede a posição (3 px); a invariância à escala do SIFT não é avaliada neste estudo (ver D20).
 
+### D25 — BRIEF próprio (4 estratégias de amostragem)
+- **Estado:** Implementada (`src/brief_own.py`, `CFG["brief_own"]`, `studies/brief_study.py`,
+  `main.py --brief`)
+- **Pedido:** enunciado §2.5: "Students are encouraged to implement a simplified BRIEF descriptor
+  themselves, following the sampling strategies described in the original paper. At least two
+  sampling strategies should be investigated."
+- **Fontes lidas (2026-10-10/11):**
+  - M. Calonder, V. Lepetit, C. Strecha, P. Fua, "BRIEF: Binary Robust Independent Elementary
+    Features", ECCV 2010, secções 3, 3.1 e 3.2 (DOI 10.1007/978-3-642-15561-1_56);
+  - M. Calonder et al., "BRIEF: Computing a Local Binary Descriptor Very Fast", IEEE TPAMI 34(7),
+    2012 (DOI 10.1109/TPAMI.2011.222), a referência do enunciado. PDFs na pasta do trabalho.
+- **O algoritmo (artigo, secção 3):** num patch S × S suavizado, centrado no keypoint, fazem-se n_d
+  testes: bit i = 1 se p(xᵢ) < p(yᵢ), senão 0. O descritor é a sequência dos bits. As únicas escolhas
+  são a suavização e a posição dos pares (xᵢ, yᵢ).
+- **As 5 estratégias do artigo (secção 3.2, origem no centro do patch):**
+
+  | | Pares (X, Y) | Implementada? |
+  |---|---|---|
+  | G I | X, Y ~ Uniforme(−S/2, S/2) | Sim |
+  | G II | X, Y ~ Gaussiana(0, S²/25) | Sim (a usada pelos autores) |
+  | G III | X ~ Gaussiana(0, S²/25); Y ~ Gaussiana(X, S²/100); fora do patch → borda | Sim |
+  | G IV | X, Y sorteados numa grelha polar grosseira | **Não** |
+  | G V | X = (0, 0); Y em todos os pontos de uma grelha polar com n_d pontos | Sim |
+
+  Resultado do artigo (Fig. 3): a G V perde para todas as aleatórias; a G II tem pequena vantagem.
+  A versão de 2012 acrescenta que a G V corresponde à transformada Census.
+- **Porquê estas 4:** G I, II e III estão totalmente especificadas. A G V é a única determinística e,
+  segundo o artigo, a pior: serve de contraste e de validação (se a nossa implementação reproduzir
+  a ordem do artigo, é sinal de que está correta). A G IV é a menos especificada (só "coarse polar
+  grid") e ficou de fora.
+- **Parâmetros (`CFG["brief_own"]`) e origem de cada um:**
+
+  | Parâmetro | Valor | Origem |
+  |---|---|---|
+  | n_d (nº de testes) | 256 (BRIEF-32) | Artigo: descritor por omissão; igual ao do OpenCV que usamos |
+  | Suavização | gaussiana 9×9, σ = 2 | ECCV 2010 §3.1 ("we use a value of 2", janela 9×9) |
+  | Patch S | 48 px | **Escolha nossa** (o artigo não dá valor) |
+  | Grelha polar (G V) | 8 anéis × 32 ângulos | **Escolha nossa** (o artigo não a especifica) |
+  | Seed | 0 (`CFG["seed"]`) | Reprodutibilidade |
+
+- **Ambiguidades do artigo e como foram resolvidas:**
+  - **Valor de S:** nenhuma das duas versões o indica. Medimos a margem do BRIEF do OpenCV: remove
+    os keypoints a menos de **28 px** da borda = 48/2 + 9/2, ou seja, patch 48 e kernel 9. Usamos
+    S = 48 para a comparação com o OpenCV ser direta (mesmos keypoints sobrevivem).
+  - **"Value of 2" na suavização:** o texto fala em variância, mas a legenda da Fig. 1 usa σ
+    (σ = 0,65 … 3,05). Interpretámos como σ = 2.
+  - **Janela 9×9 ou 7×7:** o ECCV 2010 diz 9×9; o TPAMI 2012 diz 7×7 e mostra que um filtro de caixa
+    7×7 dá a mesma exatidão. Usamos 9×9 gaussiana (versão original). O OpenCV usa filtro de caixa com
+    imagens integrais, por isso os descritores não são bit a bit iguais aos nossos.
+  - **Coordenadas fora do patch:** o artigo só refere o encosto à borda na G III. Aplicamos o mesmo na
+    G II (com σ = S/5, ±2,5σ é a borda; ~1% das coordenadas cai fora).
+  - **Arredondamento:** as coordenadas sorteadas são reais e arredondam-se ao píxel mais próximo.
+- **Implementação:**
+  - `make_pairs(strategy, S, n_bits, seed, polar_radii)`: gera os pares uma vez (com cache). São os
+    **mesmos pares nas duas imagens** (a mesma seed); sem isso o descritor não é comparável.
+  - `BriefOwn.compute(gray, kps)`: suaviza a imagem em float32 (evita empates criados pelo
+    arredondamento para inteiros), remove os keypoints a menos de 28 px da borda, compara os píxeis
+    de todos os pares de uma vez (NumPy) e empacota os bits com `np.packbits` → `uint8 (N, 32)`,
+    usado com `NORM_HAMMING`.
+  - Mesma interface do OpenCV (`compute`), por isso entra em `descriptors.describe` sem casos
+    especiais. Pipelines: `FAST+BRIEF-GI`, `FAST+BRIEF-GII`, `FAST+BRIEF-GIII`, `FAST+BRIEF-GV`.
+  - Não entram no `--part1` por omissão (`methods.DEFAULT_PIPELINES` = 6 configurações clássicas).
+  - Sem orientação nem escala, como o BRIEF original.
+- **Propriedades dos pares gerados (seed 0):**
+
+  | | comprimento médio do par | testes distintos | degenerados (x = y) |
+  |---|---|---|---|
+  | G I | 24,3 px | 256 | 0 |
+  | G II | 15,9 px | 255 | 0 |
+  | G III | 5,5 px | 256 | 3 |
+  | G V | 13,5 px | 240 | 0 |
+
+  Os 3 testes degenerados da G III (os dois pontos caem no mesmo píxel depois de arredondar) dão
+  sempre bit 0, e os 16 repetidos da G V (ângulos do anel interior que caem no mesmo píxel) dão bits
+  iguais. Não foram corrigidos: são consequência direta do método do artigo e não afetam a
+  comparação (bits constantes ou repetidos contam igual nas duas imagens).
+- **Validação (2026-10-11), para evitar o erro do grupo do ano passado (precisão ~1%):**
+  - mesma imagem contra si própria: precisão 1,0 e distância de Hamming 0 nas 4 estratégias;
+  - nº de keypoints depois do `compute()` igual ao do OpenCV (1455, 1850, 1394 em 3 imagens): a
+    margem à borda é a mesma;
+  - pares fáceis: `i_nescafe` 1→2: precisão 0,95–0,99 (OpenCV 0,98); `v_wall` 1→2: 0,91–0,97
+    (OpenCV 0,95). A G II fica muito próxima do OpenCV (0,976 vs 0,976; 0,957 vs 0,953).
+- **Estudo (`--brief`):** FAST + BRIEF do OpenCV e FAST + as 4 estratégias, com o mesmo detetor
+  (FAST t=20, NMS, limite de 2000 pontos), o mesmo matching e o mesmo protocolo, nas 4 categorias
+  (i, v no HPatches completo; rot, scale no teste sintético). Saídas: `<tag>_brief_T7.csv` (tabela
+  T7), `<tag>_brief_T2_matching.csv` (denominadores), `<tag>_brief_T5_cost.csv`,
+  `<tag>_brief_F1_by_k.csv`, `<tag>_brief_raw.csv`; figuras dos padrões em
+  `results/figures/brief_own/brief_pattern_<estratégia>.png` e `legendas.md`.
+- **Resultados (corrida de 2026-10-11: 580 pares HPatches + 21 níveis sintéticos, 0 erros):**
+
+  | Descritor (com FAST) | precisão `i` | precisão `v` | MS `i` | MS `v` | recall `i` | recall `v` | precisão `rot` | precisão `scale` | t_desc (ms) |
+  |---|---|---|---|---|---|---|---|---|---|
+  | BRIEF OpenCV | 0,777 | 0,602 | 0,257 | 0,125 | 0,450 | 0,252 | 0,091 | 0,570 | 4,1 |
+  | Próprio G I | 0,815 | 0,579 | 0,272 | 0,094 | 0,476 | 0,187 | 0,060 | 0,477 | 15,2 |
+  | Próprio G II | 0,814 | 0,632 | 0,278 | **0,130** | 0,490 | **0,261** | 0,109 | **0,624** | 15,2 |
+  | Próprio G III | **0,862** | **0,647** | **0,313** | 0,115 | **0,560** | 0,228 | 0,095 | 0,592 | 15,3 |
+  | Próprio G V | 0,710 | 0,497 | 0,225 | 0,095 | 0,392 | 0,190 | 0,111 | 0,526 | 14,9 |
+
+  285 pares `i`, 295 pares `v`, 12 níveis de rotação, 9 de escala. Todos com os mesmos keypoints
+  FAST (N_features médio: 1582 em `i`, 1770 em `v`) e 32 bytes por descritor.
+- **Observações para o relatório:**
+  - **A implementação está validada:** a G II (a do artigo) fica ao nível do BRIEF do OpenCV e um
+    pouco acima em todas as métricas (ex.: MS 0,278 vs 0,257 em `i`; 0,130 vs 0,125 em `v`). A
+    diferença pode vir da suavização (gaussiana nossa, filtro de caixa no OpenCV) e do padrão de pares.
+  - **Reproduz a conclusão do artigo:** a G V (regular, a partir do centro) é a pior em precisão,
+    matching score e recall em `i`, e em precisão em `v`. Em ponto de vista (o caso testado no artigo,
+    sequência Wall), a G II tem o melhor matching score e recall.
+  - **G III (pares curtos):** a melhor em iluminação (precisão 0,862; MS 0,313) e com a precisão mais
+    alta em `v`, mas com menos matches em `v` do que a G II (MS 0,115 vs 0,130).
+  - **G I (pares longos, uniformes):** boa em iluminação, mas a pior em `v` (MS 0,094), em escala
+    (0,477) e em rotação (precisão 0,72 a 15°, contra 0,87–0,90 nas outras). Pares mais longos
+    deslocam-se mais quando a imagem roda ou muda de escala.
+  - **Rotação:** nenhuma estratégia resolve a falta de orientação. Todas caem a partir de 30°
+    (precisão ≤ 0,22), como no artigo ("up to 10 to 15 degrees, there is little degradation followed
+    by a precipitous drop"). A média da categoria `rot` é ≤ 0,11 em todas.
+  - **Custo:** o descritor próprio demora ~15 ms por imagem contra ~4 ms do OpenCV (NumPy com
+    suavização gaussiana da imagem inteira vs C++ com imagens integrais). O tamanho é igual (32 bytes).
+
 ## Ambiente e repositório
 
 ### D13 — Ambiente Python
@@ -530,8 +653,9 @@ Pontos e tempo: 285 pares `i`, 295 pares `v`. Repetibilidade: 188 pares `i`, 113
 
 ## Pendentes / a confirmar
 
-- **P01** — Perguntar ao professor se o BRIEF próprio é obrigatório e com quantas estratégias. Plano:
-  fazer G I e G II no mínimo, idealmente G I–V.
+- **P01** — ~~Perguntar ao professor se o BRIEF próprio é obrigatório e com quantas estratégias~~
+  Resolvido em 2026-10-11: implementadas 4 estratégias (G I, II, III, V), acima do mínimo de 2 do
+  enunciado (D25).
 - **P02** — Que imagens usar no stitching (há `data/Panorama/keble_*.jpg` e `data/vehicle-seqs/`).
 - **P03** — HPatches completo ou subconjunto para SuperPoint/LightGlue em CPU (a GPU com CUDA
   parece disponível no `cvc`: torch cu126).
@@ -543,7 +667,7 @@ Pontos e tempo: 285 pares `i`, 295 pares `v`. Repetibilidade: 188 pares `i`, 113
   limiares no config.
 - **P06 (2026-10-08)** — **Pipelines aprendidos por registar** em `methods.py` (SuperPoint+NN,
   SuperPoint+LightGlue, SIFT+LightGlue): depende de `learned.py` (Pessoa B).
-- **P07 (2026-10-08)** — `main.py`: existem `--part1`, `--rotscale`, `--robustness`, `--qualitative`,
-  `--graf` e `--fast`. Faltam `--brief` (Pessoa A) e `--part2` (Pessoa B).
+- **P07 (2026-10-08, atualizado 2026-10-11)** — `main.py`: existem `--part1`, `--rotscale`,
+  `--robustness`, `--qualitative`, `--graf`, `--fast` e `--brief`. Falta `--part2` (Pessoa B).
 - **P08 (2026-10-08)** — ~~Análise qualitativa GRAF~~ feita (D21). Falta decidir se as figuras
   (30 JPEG, ≈ 13 MB) vão para o git ou se se geram só para a entrega.

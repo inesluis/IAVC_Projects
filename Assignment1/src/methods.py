@@ -4,14 +4,18 @@
 # learned.py (Pessoa B) estiver implementado. Ver DECISOES.md, P06.
 """
 
-from descriptors import CLASSIC_COMBOS, make_extractor
+from descriptors import BRIEF_OWN_COMBOS, CLASSIC_COMBOS, make_extractor
 from interface import Pipeline
 from matching import match_descriptors
 
 PIPELINES: dict[str, Pipeline] = {
     combo: Pipeline(name=combo, extract=make_extractor(combo), match=match_descriptors)
-    for combo in CLASSIC_COMBOS
+    for combo in CLASSIC_COMBOS + BRIEF_OWN_COMBOS
 }
+
+# Pipelines usados por omissão (--part1 sem --pipelines): as configurações mínimas do enunciado.
+# O BRIEF próprio (FAST+BRIEF-G*) está registado mas só entra no seu estudo (--brief) ou a pedido.
+DEFAULT_PIPELINES = list(CLASSIC_COMBOS)
 
 
 def register(p: Pipeline) -> None:
@@ -22,9 +26,9 @@ def register(p: Pipeline) -> None:
 
 
 def get_pipelines(names=None) -> list[Pipeline]:
-    """Pipelines pela ordem pedida (todos se names=None)."""
+    """Pipelines pela ordem pedida (DEFAULT_PIPELINES se names=None)."""
     if names is None:
-        return list(PIPELINES.values())
+        names = DEFAULT_PIPELINES
     missing = [n for n in names if n not in PIPELINES]
     if missing:
         raise KeyError(f"Pipelines desconhecidos: {missing} (disponíveis: {list(PIPELINES)})")

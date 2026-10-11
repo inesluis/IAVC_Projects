@@ -5,6 +5,7 @@ Figuras matplotlib com eixos em píxeis e identificação de cada imagem (D21):
   plot_matches    — duas imagens lado a lado; linhas verdes/vermelhas segundo uma máscara booleana
                     (matches corretos vs errados com a H GT, ou inliers vs outliers do RANSAC)
   plot_curves     — gráfico de linhas (estudos de parâmetros, curvas por nível)
+  plot_test_pattern — pares de teste de um descritor binário (BRIEF próprio)
   save_figure     — grava (PNG ou JPEG pela extensão) e fecha a figura
 """
 
@@ -93,6 +94,24 @@ def plot_matches(img1: np.ndarray, img2: np.ndarray, f1: Features, f2: Features,
     fig.legend(handles=handles, loc="outside lower center", ncol=len(handles), fontsize=10, frameon=False)
     fig.suptitle(title, fontsize=12)
     return fig, len(idx)
+
+
+def plot_test_pattern(pairs: np.ndarray, patch_size: int, title: str):
+    """Padrão de testes de um descritor binário: um segmento por par (x_i, y_i), em coordenadas do
+    patch (origem no centro, píxeis). pairs: (n, 4) com (x1, y1, x2, y2)."""
+    half = patch_size / 2
+    fig, ax = plt.subplots(figsize=(5, 5.3), layout="constrained")
+    for x1, y1, x2, y2 in pairs:
+        ax.plot([x1, x2], [y1, y2], color="#1f77b4", linewidth=0.7, alpha=0.7)
+    ax.scatter(pairs[:, [0, 2]].ravel(), pairs[:, [1, 3]].ravel(), s=4, color="black", zorder=3)
+    ax.set_xlim(-half - 1, half + 1)
+    ax.set_ylim(half + 1, -half - 1)          # y para baixo, como na imagem
+    ax.set_aspect("equal")
+    ax.set_xlabel("x (px, relativo ao centro do patch)")
+    ax.set_ylabel("y (px, relativo ao centro do patch)")
+    ax.set_title(title, fontsize=11)
+    ax.grid(True, alpha=0.3)
+    return fig
 
 
 def plot_curves(series: list[dict], xlabel: str, ylabel: str, title: str, hlines: list[dict] = (),

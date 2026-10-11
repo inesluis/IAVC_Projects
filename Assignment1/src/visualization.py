@@ -6,6 +6,7 @@ Figuras matplotlib com eixos em píxeis e identificação de cada imagem (D21):
                     (matches corretos vs errados com a H GT, ou inliers vs outliers do RANSAC)
   plot_curves     — gráfico de linhas (estudos de parâmetros, curvas por nível)
   plot_test_pattern — pares de teste de um descritor binário (BRIEF próprio)
+  plot_scatter    — dispersão com um ponto por método (compromisso exatidão vs tempo)
   save_figure     — grava (PNG ou JPEG pela extensão) e fecha a figura
 """
 
@@ -115,9 +116,10 @@ def plot_test_pattern(pairs: np.ndarray, patch_size: int, title: str):
 
 
 def plot_curves(series: list[dict], xlabel: str, ylabel: str, title: str, hlines: list[dict] = (),
-                logx: bool = False, logy: bool = False, xticks=None):
+                logx: bool = False, logy: bool = False, xticks=None, xticklabels=None, ylim=None):
     """Gráfico de linhas. series: [{"x", "y", "label", "style"(opcional, ex. "-o"), "color"(opcional)}];
-    hlines: [{"y", "label"}] linhas horizontais de referência (pontilhado preto)."""
+    hlines: [{"y", "label"}] linhas horizontais de referência (pontilhado preto);
+    xticklabels: rótulos dos xticks (omissão: os valores); ylim: (mín, máx) do eixo y."""
     fig, ax = plt.subplots(figsize=(7, 4.6), layout="constrained")
     for s in series:
         ax.plot(s["x"], s["y"], s.get("style", "-o"), label=s["label"], color=s.get("color"),
@@ -130,13 +132,34 @@ def plot_curves(series: list[dict], xlabel: str, ylabel: str, title: str, hlines
         ax.set_yscale("log")
     if xticks is not None:
         ax.set_xticks(xticks)
-        ax.set_xticklabels([f"{v:g}" for v in xticks])
+        ax.set_xticklabels(xticklabels if xticklabels is not None else [f"{v:g}" for v in xticks])
         ax.xaxis.set_minor_locator(NullLocator())     # só os ticks pedidos no eixo x
+    if ylim is not None:
+        ax.set_ylim(*ylim)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title, fontsize=11)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=8)
+    return fig
+
+
+def plot_scatter(points: list[dict], xlabel: str, ylabel: str, title: str, logx: bool = False, ylim=None):
+    """Gráfico de dispersão com um ponto por método, identificado na legenda (cor e marcador).
+    points: [{"x", "y", "label", "color"(opcional), "marker"(opcional)}]."""
+    fig, ax = plt.subplots(figsize=(7, 4.6), layout="constrained")
+    for p in points:
+        ax.scatter(p["x"], p["y"], s=80, color=p.get("color"), marker=p.get("marker", "o"),
+                   label=p["label"], zorder=3)
+    ax.legend(fontsize=8)
+    if logx:
+        ax.set_xscale("log")
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title, fontsize=11)
+    ax.grid(True, which="both", alpha=0.3)
     return fig
 
 

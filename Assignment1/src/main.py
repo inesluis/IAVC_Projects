@@ -22,6 +22,8 @@ from evaluation import evaluate_pairs, run_hpatches, save_tables, summarize
 from methods import get_pipelines
 from studies.brief_study import BRIEF_STUDY_PIPELINES, plot_patterns
 from studies.brief_study import write_captions as write_brief_captions
+from studies.curves import load_raw, plot_level_curves, plot_tradeoff
+from studies.curves import write_captions as write_curve_captions
 from studies.fast_study import plot_fast, run_fast_study, summarize_fast
 from studies.fast_study import write_captions as write_fast_captions
 from studies.qualitative import run_qualitative
@@ -104,6 +106,24 @@ def run_robustness(args) -> None:
     print(rob.round(3).to_string())
 
 
+def run_curves(args) -> None:
+    """Gráficos F1 (curvas por nível) e F2 (exatidão vs tempo) a partir dos CSV já calculados (D26).
+    Clássicos: <tag>_raw.csv + <tag>_rotscale_raw.csv -> results/figures/curves/
+    BRIEF próprio (se existir): <tag>_brief_raw.csv -> results/figures/curves_brief/"""
+    cfg = _cfg_from_args(args)
+    tables_dir, figs, p = cfg["paths"]["tables"], cfg["paths"]["figures"], _prefix(args.tag)
+    jobs = [("curves", "curvas dos métodos clássicos", [tables_dir / f"{p}raw.csv", tables_dir / f"{p}rotscale_raw.csv"]),
+            ("curves_brief", "curvas do BRIEF próprio", [tables_dir / f"{p}brief_raw.csv"])]
+    for folder, title, paths in jobs:
+        if not all(f.exists() for f in paths):
+            print(f"[{folder}] em falta: {[f.name for f in paths if not f.exists()]} — ignorado")
+            continue
+        df = load_raw(paths)
+        entries = plot_level_curves(df, cfg, figs / folder) + plot_tradeoff(df, cfg, figs / folder)
+        write_curve_captions(entries, figs / folder / "legendas.md", title)
+        print(f"[{folder}] {len(entries)} figuras em {figs / folder}")
+
+
 def _robustness_table(tables: dict) -> pd.DataFrame:
     """pipeline x {i, v, rot, scale}: PMR, precision, matching score, recall, repetibilidade (D19)."""
     rob = tables["T2_matching"][["PMR", "precision", "matching_score", "recall"]].join(
@@ -154,6 +174,7 @@ def main() -> None:
     ap.add_argument("--graf", action="store_true", help="métricas nos pares GRAF 1->2 e 1->3")
     ap.add_argument("--fast", action="store_true", help="estudo do FAST (threshold x NMS vs SIFT)")
     ap.add_argument("--brief", action="store_true", help="estudo do BRIEF próprio (G I, II, III, V vs OpenCV)")
+    ap.add_argument("--curves", action="store_true", help="gráficos F1/F2 a partir dos CSV já calculados")
     ap.add_argument("--pipelines", nargs="+", default=None,
                     help="subconjunto de pipelines (omissão: as 6 configurações clássicas)")
     ap.add_argument("--seqs", nargs="+", default=None, help="subconjunto de sequências (omissão: todas)")
@@ -163,7 +184,7 @@ def main() -> None:
                     help="--fast: reutiliza <tag>_fast_raw.csv se existir (não repete a corrida)")
     args = ap.parse_args()
     if not (args.part1 or args.rotscale or args.robustness or args.qualitative or args.graf or args.fast
-            or args.brief):
+            or args.brief or args.curves):
         ap.print_help()
         return
     if args.part1:
@@ -176,6 +197,8 @@ def main() -> None:
         run_fast(args)
     if args.brief:
         run_brief(args)
+    if args.curves:
+        run_curves(args)
     if args.robustness:
         run_robustness(args)
     if args.qualitative:

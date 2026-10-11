@@ -59,6 +59,7 @@ python src/main.py --graf --tag classic         # métricas GRAF 1->2 e 1->3 (po
 python src/main.py --fast --tag classic         # estudo do FAST (threshold x NMS vs SIFT) -> classic_fast_T6.csv + results/figures/fast_study/
 python src/main.py --fast --tag classic --reuse-raw   # refaz só a tabela e as figuras do FAST a partir do CSV
 python src/main.py --brief --tag classic        # BRIEF próprio (G I, II, III, V) vs OpenCV -> classic_brief_T7.csv + results/figures/brief_own/
+python src/main.py --curves --tag classic       # gráficos F1 (curvas por nível) e F2 (exatidão vs tempo) a partir dos CSV -> results/figures/curves*/
 # opções: --pipelines SIFT ORB ...  --seqs i_ajuntament v_graffiti ...  --max-kps 2000|none
 ```
 

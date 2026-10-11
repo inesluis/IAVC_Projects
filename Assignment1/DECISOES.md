@@ -614,6 +614,59 @@ Pontos e tempo: 285 pares `i`, 295 pares `v`. Repetibilidade: 188 pares `i`, 113
   - **Custo:** o descritor próprio demora ~15 ms por imagem contra ~4 ms do OpenCV (NumPy com
     suavização gaussiana da imagem inteira vs C++ com imagens integrais). O tamanho é igual (32 bytes).
 
+### D26 — Gráficos F1 (curvas por nível) e F2 (exatidão vs tempo)
+- **Estado:** Implementada (`studies/curves.py`, `visualization.plot_curves`/`plot_scatter`,
+  `main.py --curves`)
+- **Pedido:** o enunciado não pede gráficos específicos, mas pede a discussão da robustez às 4
+  transformações e do compromisso exatidão vs eficiência (§5). Os gráficos sustentam essas discussões
+  (sugestões F1 e F2 do guia).
+- **Dados:** os CSV por par já calculados; **nenhuma corrida é repetida**.
+  - Clássicos: `<tag>_raw.csv` + `<tag>_rotscale_raw.csv` → `results/figures/curves/`
+  - BRIEF próprio: `<tag>_brief_raw.csv` → `results/figures/curves_brief/`
+- **F1 — curvas por nível:** uma figura por categoria (`i`, `v`, `rot`, `scale`) e por métrica
+  (precisão, matching score, recall, repetibilidade), com uma linha por método → 16 figuras
+  (`F1_<métrica>_<categoria>.png`). Eixo x: par 1→k (HPatches), ângulo (rotação) ou fator de escala
+  (eixo logarítmico, para 0,5× e 2× ficarem simétricos em relação a 1).
+- **F2 — compromisso:** tempo total médio por par (eixo x, logarítmico) contra matching score e
+  contra precisão (eixo y), um ponto por método, para `i` e `v` → 4 figuras
+  (`F2_<métrica>_vs_time_<categoria>.png`). Tempo total = 2 × (deteção + descrição) + matching (D06).
+- **Escolhas de apresentação:**
+  - aqui os métodos vão **todos na mesma figura** (ao contrário das figuras qualitativas, D21), porque
+    o objetivo é compará-los;
+  - cada método tem a mesma cor e o mesmo marcador em todas as figuras;
+  - precisão e repetibilidade com o eixo y fixo de 0 a 1 (figuras comparáveis entre si); matching
+    score e recall com o eixo ajustado aos dados, porque os valores são baixos (< 0,35 em `v`) e com
+    0–1 as curvas ficavam ilegíveis;
+  - os controlos (0° e escala 1) **aparecem** nas curvas (D20: só saem das médias por categoria);
+  - no F2 os métodos são identificados por legenda (etiquetas junto aos pontos sobrepunham-se).
+- **Rigor nas legendas (`legendas.md` em cada pasta):** nas `v_*` a mudança de ponto de vista aumenta
+  de 1→2 para 1→6; nas `i_*` as imagens 2 a 6 são só condições de iluminação diferentes, **sem ordem
+  de dificuldade garantida**, e a legenda di-lo. Cada ponto das curvas HPatches é a média de 57 (`i`)
+  ou 59 (`v`) pares; nas sintéticas é um único par por nível.
+- **Observações para o relatório (corrida de 2026-10-08):**
+  - **Ponto de vista (precisão, 1→2 … 1→6):** SIFT 0,89 → 0,59; KAZE 0,89 → 0,60; ORB 0,89 → 0,49;
+    FAST+BRIEF 0,78 → 0,41; FAST+BRISK 0,73 → 0,35; FAST+FREAK 0,71 → 0,36. Todos degradam; SIFT e
+    KAZE degradam menos.
+  - **Rotação:** o FAST+BRIEF cai de 0,88 (15°) para 0,17 (30°) e 0 a partir de 45°; o ORB desce
+    lentamente até 0,87–0,89 acima de 135°; os restantes ficam ≥ 0,97.
+  - **Escala:** os FAST+X formam um "sino" em torno de 1 (≥ 0,94 entre 0,8× e 1,25×; ≤ 0,35 a 0,6× e
+    ≤ 0,27 a 1,75×); SIFT ≥ 0,95 em todos os níveis; KAZE e ORB descem para 0,79 e 0,85 a 2×.
+  - **Compromisso (tempo total por par; matching score):**
+
+    | Método | tempo `i` (ms) | MS `i` | tempo `v` (ms) | MS `v` |
+    |---|---|---|---|---|
+    | FAST+BRIEF | 20 | 0,257 | 26 | 0,125 |
+    | FAST+BRISK | 35 | 0,180 | 43 | 0,079 |
+    | ORB | 37 | 0,154 | 46 | 0,133 |
+    | FAST+FREAK | 56 | 0,169 | 64 | 0,086 |
+    | SIFT | 295 | 0,191 | 377 | 0,200 |
+    | KAZE | 1153 | 0,226 | 1425 | 0,173 |
+
+    Em iluminação, o FAST+BRIEF é ao mesmo tempo o mais rápido e o de maior matching score. Em ponto de
+    vista, o SIFT tem o maior matching score e o KAZE é ~4× mais lento com um valor mais baixo. Entre
+    os rápidos (< 70 ms), o ORB é o melhor em ponto de vista. Base para a discussão "tempo real vs
+    exatidão" pedida no enunciado (a completar com os métodos aprendidos da Pessoa B).
+
 ## Ambiente e repositório
 
 ### D13 — Ambiente Python
@@ -668,6 +721,7 @@ Pontos e tempo: 285 pares `i`, 295 pares `v`. Repetibilidade: 188 pares `i`, 113
 - **P06 (2026-10-08)** — **Pipelines aprendidos por registar** em `methods.py` (SuperPoint+NN,
   SuperPoint+LightGlue, SIFT+LightGlue): depende de `learned.py` (Pessoa B).
 - **P07 (2026-10-08, atualizado 2026-10-11)** — `main.py`: existem `--part1`, `--rotscale`,
-  `--robustness`, `--qualitative`, `--graf`, `--fast` e `--brief`. Falta `--part2` (Pessoa B).
+  `--robustness`, `--qualitative`, `--graf`, `--fast`, `--brief` e `--curves`. Falta `--part2`
+  (Pessoa B).
 - **P08 (2026-10-08)** — ~~Análise qualitativa GRAF~~ feita (D21). Falta decidir se as figuras
   (30 JPEG, ≈ 13 MB) vão para o git ou se se geram só para a entrega.

@@ -1,35 +1,28 @@
-"""Registo PIPELINES: nome -> Pipeline (extrator + matcher). Clássicos [A], aprendidos [B].
+"""Lista dos métodos avaliados e as duas funções que os correm: extrair e emparelhar.
 
-# PENDENTE (2026-10-08): registar SuperPoint+NN, SuperPoint+LightGlue e SIFT+LightGlue quando
-# learned.py (Pessoa B) estiver implementado. Ver DECISOES.md, P06.
+Um método é um nome, por exemplo "SIFT" ou "FAST+BRIEF". As experiências chamam sempre
+extract_features() e match_features(), por isso para acrescentar um método basta acrescentar
+o nome à lista e um ramo em cada função.
+
+# PENDENTE (2026-10-08): métodos aprendidos (SuperPoint+NN, SuperPoint+LightGlue, SIFT+LightGlue).
+# Dependem de learned.py (Pessoa B). Ver DECISOES.md, P06.
 """
 
-from descriptors import BRIEF_OWN_COMBOS, CLASSIC_COMBOS, make_extractor
-from interface import Pipeline
+from descriptors import BRIEF_OWN_NAMES, extract
 from matching import match_descriptors
 
-PIPELINES: dict[str, Pipeline] = {
-    combo: Pipeline(name=combo, extract=make_extractor(combo), match=match_descriptors)
-    for combo in CLASSIC_COMBOS + BRIEF_OWN_COMBOS
-}
+# As configurações clássicas mínimas do enunciado (§4)
+CLASSIC_METHODS = ["SIFT", "ORB", "KAZE", "FAST+BRIEF", "FAST+BRISK", "FAST+FREAK"]
 
-# Pipelines usados por omissão (--part1 sem --pipelines): as configurações mínimas do enunciado.
-# O BRIEF próprio (FAST+BRIEF-G*) está registado mas só entra no seu estudo (--brief) ou a pedido.
-DEFAULT_PIPELINES = list(CLASSIC_COMBOS)
+# FAST + BRIEF próprio, uma configuração por estratégia de amostragem (D25)
+BRIEF_OWN_METHODS = ["FAST+" + name for name in BRIEF_OWN_NAMES]
 
 
-def register(p: Pipeline) -> None:
-    """Acrescenta um pipeline ao registo (ex.: métodos aprendidos, BRIEF próprio)."""
-    if p.name in PIPELINES:
-        raise ValueError(f"Pipeline já registado: {p.name}")
-    PIPELINES[p.name] = p
+def extract_features(method: str, gray, cfg: dict):
+    """Deteta e descreve uma imagem em cinzento com o método dado. Devolve Features."""
+    return extract(method, gray, cfg)
 
 
-def get_pipelines(names=None) -> list[Pipeline]:
-    """Pipelines pela ordem pedida (DEFAULT_PIPELINES se names=None)."""
-    if names is None:
-        names = DEFAULT_PIPELINES
-    missing = [n for n in names if n not in PIPELINES]
-    if missing:
-        raise KeyError(f"Pipelines desconhecidos: {missing} (disponíveis: {list(PIPELINES)})")
-    return [PIPELINES[n] for n in names]
+def match_features(method: str, f1, f2, cfg: dict):
+    """Emparelha as features de duas imagens. Devolve (matches, tempo em ms)."""
+    return match_descriptors(f1, f2, cfg)

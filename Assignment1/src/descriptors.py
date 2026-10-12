@@ -1,101 +1,81 @@
-"""Descritores clássicos: SIFT, ORB, KAZE, BRIEF, BRISK, FREAK; extract_classic(detetor+descritor).  [Pessoa A]"""
+"""Descritores (SIFT, ORB, KAZE, BRIEF, BRISK, FREAK, BRIEF próprio) e extração completa.  [Pessoa A]"""
 
-import functools
 import time
 
 import cv2
 import numpy as np
 
-from brief_own import STRATEGIES as BRIEF_OWN_STRATEGIES
-from brief_own import BriefOwn
-from detectors import check_gray, create_detector, detect
+from brief_own import STRATEGIES, compute_brief, make_pairs
+from detectors import create_detector, detect
 from interface import Features
 
-# Norma de matching de cada descritor: float -> L2, binário -> Hamming (enunciado §2.5).
-DESCRIPTOR_NORM = {
-    "SIFT": cv2.NORM_L2,
-    "KAZE": cv2.NORM_L2,
-    "ORB": cv2.NORM_HAMMING,
-    "BRIEF": cv2.NORM_HAMMING,
-    "BRISK": cv2.NORM_HAMMING,
-    "FREAK": cv2.NORM_HAMMING,
-}
-# BRIEF próprio (D25): "BRIEF-GI", "BRIEF-GII", "BRIEF-GIII", "BRIEF-GV"
-_BRIEF_OWN = {f"BRIEF-{s}": s for s in BRIEF_OWN_STRATEGIES}
-DESCRIPTOR_NORM |= {name: cv2.NORM_HAMMING for name in _BRIEF_OWN}
+# Distância usada no matching: L2 nos descritores float, Hamming nos binários (enunciado §2.5)
+FLOAT_DESCRIPTORS = ["SIFT", "KAZE"]
 
-# Configurações FAST + BRIEF próprio, uma por estratégia de amostragem.
-BRIEF_OWN_COMBOS = tuple(f"FAST+{name}" for name in _BRIEF_OWN)
+# Nomes dos descritores BRIEF próprios: "BRIEF-GI", "BRIEF-GII", "BRIEF-GIII", "BRIEF-GV"
+BRIEF_OWN_NAMES = ["BRIEF-" + s for s in STRATEGIES]
 
-# Descritores que só podem ser usados com o seu próprio detetor (dependem de escala/octava
-# atribuídas por esse detetor). Os restantes funcionam sobre keypoints de qualquer detetor. D11
-_OWN_DETECTOR_ONLY = {"SIFT", "KAZE", "ORB"}
 
-# Configurações clássicas mínimas do enunciado (§4).
-CLASSIC_COMBOS = ("SIFT", "ORB", "KAZE", "FAST+BRIEF", "FAST+BRISK", "FAST+FREAK")
+def descriptor_norm(name: str) -> int:
+    return cv2.NORM_L2 if name in FLOAT_DESCRIPTORS else cv2.NORM_HAMMING
 
 
 def create_descriptor(name: str, cfg: dict):
-    """Cria o objeto que calcula o descritor `name` (OpenCV, ou BriefOwn para o BRIEF próprio)."""
+    """Cria o descritor do OpenCV com os parâmetros do config."""
     if name in ("SIFT", "ORB", "KAZE"):
-        return create_detector(name, cfg)   # mesmo objeto/parâmetros que o detetor
-    if name in _BRIEF_OWN:
-        return BriefOwn(_BRIEF_OWN[name], cfg)   # os pares são gerados aqui, fora do tempo medido
-    p = cfg["descriptors"].get(name, {})
+        return create_detector(name, cfg)   # nestes métodos o mesmo objeto deteta e descreve
+    params = cfg["descriptors"][name]
     if name == "BRIEF":
-        return cv2.xfeatures2d.BriefDescriptorExtractor_create(**p)
+        return cv2.xfeatures2d.BriefDescriptorExtractor_create(**params)
     if name == "BRISK":
-        return cv2.BRISK_create(**p)
+        return cv2.BRISK_create(**params)
     if name == "FREAK":
-        return cv2.xfeatures2d.FREAK_create(**p)
-    raise ValueError(f"Descritor desconhecido: {name} (disponíveis: {tuple(DESCRIPTOR_NORM)})")
+        return cv2.xfeatures2d.FREAK_create(**params)
+    raise ValueError(f"Descritor desconhecido: {name}")
 
 
-def describe(name: str, gray: np.ndarray, kps: list[cv2.KeyPoint], cfg: dict
-             ) -> tuple[list[cv2.KeyPoint], np.ndarray | None, int, float]:
-    """Calcula descritores `name` para os keypoints dados.
+def describe(name: str, gray, kps, cfg: dict):
+    """Calcula os descritores dos keypoints. Devolve (keypoints, descritores, tempo em ms).
 
-    Devolve (kps_filtrados, desc, norm, t_desc_ms). ATENÇÃO: compute() remove keypoints
-    (ex.: perto da borda), por isso a lista devolvida pode ser mais curta e é a que deve ser usada.
-    desc é None se não sobrar nenhum keypoint.
+    Atenção: os descritores removem keypoints (por exemplo, junto à borda), por isso a lista
+    devolvida pode ser mais curta e é essa que tem de ser usada. O tempo não inclui a preparação
+    (criar o objeto do OpenCV ou gerar os pares do BRIEF próprio), tal como na deteção (D06).
     """
-    check_gray(gray)
-    ext = create_descriptor(name, cfg)
-    t0 = time.perf_counter()
-    kps_out, desc = ext.compute(gray, list(kps))
-    t_desc = (time.perf_counter() - t0) * 1e3
-    kps_out = list(kps_out) if kps_out is not None else []
-    if desc is None or len(kps_out) == 0:
-        return [], None, DESCRIPTOR_NORM[name], t_desc
-    if DESCRIPTOR_NORM[name] == cv2.NORM_L2:
+    if name in BRIEF_OWN_NAMES:
+        pairs = make_pairs(name.removeprefix("BRIEF-"), cfg)
+        t0 = time.perf_counter()
+        kps, desc = compute_brief(gray, kps, pairs, cfg)
+    else:
+        descriptor = create_descriptor(name, cfg)
+        t0 = time.perf_counter()
+        kps, desc = descriptor.compute(gray, list(kps))
+    t_desc = (time.perf_counter() - t0) * 1000
+
+    kps = list(kps) if kps is not None else []
+    if desc is None or len(kps) == 0:
+        return [], None, t_desc
+    if name in FLOAT_DESCRIPTORS:
         desc = desc.astype(np.float32, copy=False)
-    return kps_out, desc, DESCRIPTOR_NORM[name], t_desc
+    return kps, desc, t_desc
 
 
-def parse_combo(combo: str) -> tuple[str, str]:
-    """"FAST+BRIEF" -> ("FAST", "BRIEF"); "SIFT" -> ("SIFT", "SIFT"). Valida a combinação."""
-    det, _, desc = combo.partition("+")
-    desc = desc or det
-    if desc in _OWN_DETECTOR_ONLY and desc != det:
-        raise ValueError(f"O descritor {desc} só pode ser usado com o detetor {desc} (pedido: {combo})")
-    return det, desc
+def split_method(method: str):
+    """"FAST+BRIEF" -> ("FAST", "BRIEF"); "SIFT" -> ("SIFT", "SIFT")."""
+    if "+" in method:
+        detector, descriptor = method.split("+")
+    else:
+        detector = descriptor = method
+    # SIFT, ORB e KAZE dependem da escala/octava do seu próprio detetor (D11)
+    if descriptor in ("SIFT", "ORB", "KAZE") and descriptor != detector:
+        raise ValueError(f"O descritor {descriptor} só funciona com o detetor {descriptor}")
+    return detector, descriptor
 
 
-def extract_classic(combo: str, gray: np.ndarray, cfg: dict) -> Features:
-    """Deteta + descreve com uma configuração clássica (ex.: "SIFT", "FAST+FREAK").
-
-    Deteção e descrição são feitas em passos separados para medir os dois tempos (D06).
-    meta["n_detected"] guarda o nº de pontos antes de compute() filtrar.
-    """
-    det_name, desc_name = parse_combo(combo)
-    kps, t_det = detect(det_name, gray, cfg)
+def extract(method: str, gray, cfg: dict) -> Features:
+    """Deteta e descreve com um método, por exemplo "SIFT" ou "FAST+FREAK".
+    A deteção e a descrição são feitas em separado para medir os dois tempos (D06)."""
+    detector, descriptor = split_method(method)
+    kps, t_det = detect(detector, gray, cfg)
     n_detected = len(kps)
-    kps, desc, norm, t_desc = describe(desc_name, gray, kps, cfg)
-    return Features(kps=kps, desc=desc, norm=norm, t_det=t_det, t_desc=t_desc, method=combo,
-                    meta={"detector": det_name, "descriptor": desc_name, "n_detected": n_detected})
-
-
-def make_extractor(combo: str):
-    """Devolve um Extractor (gray, cfg) -> Features para registar em methods.PIPELINES."""
-    parse_combo(combo)   # falha cedo se a combinação for inválida
-    return functools.partial(extract_classic, combo)
+    kps, desc, t_desc = describe(descriptor, gray, kps, cfg)
+    return Features(kps, desc, descriptor_norm(descriptor), t_det, t_desc, method, n_detected)

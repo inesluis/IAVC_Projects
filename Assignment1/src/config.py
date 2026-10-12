@@ -1,24 +1,21 @@
-"""Parâmetros únicos de todas as experiências (A + B): eps 3 px, ratio 0.8, max_keypoints,
-FAST, BRIEF próprio, RANSAC, seeds e caminhos. Nenhum módulo deve ter parâmetros fixos no código.
+"""Parâmetros de todas as experiências num único sítio. Nenhum outro ficheiro tem valores fixos.
 
-Cada escolha está justificada em DECISOES.md (referência Dxx ao lado de cada parâmetro).
+As justificações estão em DECISOES.md (referências Dxx).
 """
 
 import copy
 from pathlib import Path
 
 import cv2
-import numpy as np
 
-# Raiz do projeto (pasta Assignment1/), independente da pasta de onde se corre o script.
+# Pasta do projeto (Assignment1/), para os caminhos não dependerem de onde se corre o script.
 ROOT = Path(__file__).resolve().parents[1]
 
 CFG = {
-    "seed": 0,                       # D07: seeds fixas (numpy, OpenCV)
-    "num_threads": None,             # D12: None = omissão do OpenCV; inteiro fixa nº de threads
+    "seed": 0,   # D07
 
     "paths": {
-        "hpatches": ROOT / "data" / "hpatches-sequences-release",   # D04
+        "hpatches": ROOT / "data" / "hpatches-sequences-release",
         "graf": ROOT / "data" / "graf",
         "panorama": ROOT / "data" / "Panorama",
         "tables": ROOT / "results" / "tables",
@@ -26,48 +23,20 @@ CFG = {
         "panoramas": ROOT / "results" / "panoramas",
     },
 
-    # ---- Protocolo de avaliação (enunciado §2.8) ----
+    # Protocolo de avaliação (enunciado §2.8)
     "eval": {
-        "eps_px": 3.0,                # correto se ||H_gt·p - p'|| < 3 px
+        "eps_px": 3.0,                # match correto se o erro com a H ground-truth for < 3 px
         "pairs_k": [2, 3, 4, 5, 6],   # pares 1->k de cada sequência HPatches
         "categories": ["i", "v"],     # iluminação / ponto de vista
     },
 
-    # ---- Teste sintético de rotação e escala (D20) ----
-    "synthetic": {
-        "base_image": ROOT / "data" / "graf" / "img1.ppm",
-        "rotations_deg": list(range(0, 181, 15)),                 # 0° = controlo
-        "scales": [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.25, 1.5, 1.75, 2.0],   # 1.0 = controlo
-        "mask_feather_px": 10,    # largura da transição suave da máscara circular (rotação)
-    },
+    # Matching (enunciado §2.8): ratio test de Lowe + cross-check (emparelhamento 1-para-1)
+    "matching": {"ratio": 0.8},
 
-    # ---- BRIEF próprio (enunciado §2.5, D25; Calonder et al., ECCV 2010, secção 3) ----
-    "brief_own": {
-        "patch_size": 48,      # S: o artigo não dá valor; 48 = BRIEF do OpenCV (margem medida de 28 px)
-        "n_bits": 256,         # n_d = 256 (BRIEF-32, o descritor por omissão do artigo e do OpenCV)
-        "blur_ksize": 9,       # janela 9x9 (ECCV 2010; a versão TPAMI 2012 usa 7x7)
-        "blur_sigma": 2.0,     # "in practice, we use a value of 2"
-        "polar_radii": 8,      # G V: 8 anéis x 32 ângulos = 256 pontos (escolha nossa)
-    },
-
-    # ---- Estudo do FAST (enunciado §2.3, D24) ----
-    "fast_study": {
-        "thresholds": [10, 20, 40, 80],   # D24: t=5 excluído (pontos de confiança mínima, ~15% dos píxeis)
-        "nms": [True, False],
-        "reference": "SIFT",      # detetor de referência na comparação
-        "chance_shifts_px": [(20, 20), (-20, -20)],   # deslocamentos da H GT para o nível ao acaso
-        "max_points_repeatability": 50_000,   # D24: acima disto (por imagem) a repetibilidade não é calculada
-    },
-
-    # ---- Figuras qualitativas (D21) ----
-    "qualitative": {
-        "max_matches_drawn": 150,      # amostra aleatória (seed fixa) mantendo a proporção certo/errado
-    },
-
-    # ---- Orçamento de pontos comum a todos os métodos (D05) ----
+    # Limite de keypoints por imagem, igual para todos os métodos (D05). None = sem limite.
     "max_keypoints": 2000,
 
-    # ---- Detetores (D09, D10) ----
+    # Detetores: valores por omissão do OpenCV 4.13 (D09). O nfeatures do ORB é o limite acima (D10).
     "detectors": {
         "SIFT": {"nOctaveLayers": 3, "contrastThreshold": 0.04, "edgeThreshold": 10, "sigma": 1.6},
         "ORB": {"scaleFactor": 1.2, "nlevels": 8, "edgeThreshold": 31, "fastThreshold": 20},
@@ -75,39 +44,52 @@ CFG = {
         "FAST": {"threshold": 10, "nonmaxSuppression": True, "type": cv2.FAST_FEATURE_DETECTOR_TYPE_9_16},
     },
 
-    # ---- Descritores (D11) ----
+    # Descritores: valores por omissão do OpenCV 4.13 (D11)
     "descriptors": {
         "BRIEF": {"bytes": 32, "use_orientation": False},
         "BRISK": {"thresh": 30, "octaves": 3, "patternScale": 1.0},
-        "FREAK": {"orientationNormalized": True, "scaleNormalized": True,
-                  "patternScale": 22.0, "nOctaves": 4},
+        "FREAK": {"orientationNormalized": True, "scaleNormalized": True, "patternScale": 22.0, "nOctaves": 4},
     },
 
-    # ---- Matching (enunciado §2.8) ----
-    "matching": {
-        "ratio": 0.8,          # rejeita se d1/d2 >= 0.8
-        "cross_check": True,   # 1-para-1
-        "backend": "bf",       # D16: "bf" (força bruta, exato) ou "flann" (aproximado)
-        "flann_checks": 50,    # nº de folhas visitadas pelo FLANN (exatidão vs velocidade)
+    # BRIEF próprio (D25; Calonder et al., ECCV 2010, secção 3)
+    "brief_own": {
+        "patch_size": 48,    # S: o artigo não dá valor; 48 é o do BRIEF do OpenCV
+        "n_bits": 256,       # BRIEF-32
+        "blur_ksize": 9,     # janela 9x9
+        "blur_sigma": 2.0,   # "in practice, we use a value of 2"
+        "polar_radii": 8,    # G V: 8 anéis x 32 ângulos = 256 pontos (escolha nossa)
     },
 
-    # ---- RANSAC (Pessoa B; usado também pela avaliação, D03) ----
+    # Teste sintético de rotação e escala (D20); 0 graus e escala 1.0 são controlos
+    "synthetic": {
+        "base_image": ROOT / "data" / "graf" / "img1.ppm",
+        "rotations_deg": list(range(0, 181, 15)),
+        "scales": [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.25, 1.5, 1.75, 2.0],
+        "mask_feather_px": 10,   # largura da transição suave da máscara circular
+    },
+
+    # Estudo do FAST (D24)
+    "fast_study": {
+        "thresholds": [10, 20, 40, 80],
+        "nms": [True, False],
+        "reference": "SIFT",
+        "chance_shifts_px": [(20, 20), (-20, -20)],   # deslocamentos da H para o nível "ao acaso"
+        "max_points_repeatability": 50_000,           # acima disto a repetibilidade não é calculada
+    },
+
+    # Figuras qualitativas (D21)
+    "qualitative": {"max_matches_drawn": 150},
+
+    # RANSAC (Pessoa B)
     "ransac": {"thr_px": 3.0, "max_iters": 2000, "confidence": 0.995},
 }
 
 
-def get_config(**overrides) -> dict:
-    """Devolve uma cópia profunda de CFG, para cada experiência poder alterar parâmetros
-    sem afetar as outras. Ex.: get_config(max_keypoints=None)."""
-    cfg = copy.deepcopy(CFG)
-    cfg.update(overrides)
-    return cfg
+def get_config() -> dict:
+    """Devolve uma cópia dos parâmetros, para uma experiência os poder alterar sem afetar as outras."""
+    return copy.deepcopy(CFG)
 
 
-def setup_env(cfg: dict) -> np.random.Generator:
-    """Fixa seeds (OpenCV e NumPy) e nº de threads do OpenCV. Chamar uma vez no início
-    de cada experiência. Devolve o gerador NumPy a usar (np.random.default_rng(seed))."""
+def set_seeds(cfg: dict) -> None:
+    """Fixa a seed do OpenCV (usada pelo RANSAC). O NumPy usa geradores criados com a mesma seed."""
     cv2.setRNGSeed(cfg["seed"])
-    if cfg.get("num_threads") is not None:
-        cv2.setNumThreads(int(cfg["num_threads"]))
-    return np.random.default_rng(cfg["seed"])

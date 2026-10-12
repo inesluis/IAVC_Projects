@@ -1,118 +1,100 @@
-"""Análise qualitativa (D19, D21): uma figura por método e por objetivo, mais legendas prontas.  [Pessoa A]
+"""Figuras qualitativas: uma figura por método e por objetivo, com legendas prontas (D19, D21).  [Pessoa A]
 
 results/figures/qualitative/
-  keypoints/<método>.jpg      keypoints na GRAF imagem 1
-  graf_1to2/<método>.jpg      matches certos (verde) / errados (vermelho), GRAF imagem 1 -> imagem 2
-  graf_1to3/<método>.jpg      idem, GRAF imagem 1 -> imagem 3 (mudança de ponto de vista forte)
-
-Numeração no relatório (D21): só temos 3 imagens GRAF, numeradas 1, 2, 3.
-A "imagem 3" é o ficheiro img4.ppm (homografia H1to4p.txt).
-  rot45/<método>.jpg          idem, par sintético rotação 45°
-  scale2/<método>.jpg         idem, par sintético escala 2x
-  legendas.md                 legenda sugerida para cada figura
+  keypoints/<método>.jpg    keypoints na imagem 1 do GRAF
+  graf_1to2/<método>.jpg    matches certos (verde) e errados (vermelho), GRAF imagem 1 -> imagem 2
+  graf_1to3/<método>.jpg    o mesmo, GRAF imagem 1 -> imagem 3 (ponto de vista mais afastado)
+  rot45/<método>.jpg        o mesmo, par sintético com rotação de 45 graus
+  scale2/<método>.jpg       o mesmo, par sintético com escala 2x
+  legendas.md
 """
 
 from pathlib import Path
 
-from datasets import load_graf_pair, load_graf_pairs
+from datasets import load_graf_pairs
 from evaluation import match_errors
-from interface import Pipeline
+from methods import extract_features, match_features
 from studies.rot_scale_study import make_pairs
-from visualization import plot_keypoints, plot_matches, save_figure
+from visualization import plot_keypoints, plot_matches, save_captions, save_figure
 
 
-def _slug(name: str) -> str:
-    """Nome de ficheiro seguro (ex.: "FAST+BRIEF" -> "FAST-BRIEF")."""
-    return name.replace("+", "-")
+def file_name(method: str) -> str:
+    """Nome de ficheiro para um método: "FAST+BRIEF" -> "FAST-BRIEF.jpg"."""
+    return method.replace("+", "-") + ".jpg"
 
 
-def _pct(c: int, n: int) -> str:
-    return f"{100 * c / n:.0f} %" if n else "—"
+def keypoint_figures(methods, pair, cfg: dict, folder: Path) -> list:
+    """Uma figura por método com os keypoints da imagem 1 do par. Devolve [(ficheiro, legenda)]."""
+    h, w = pair.gray1.shape
+    limit = f"limite de {cfg['max_keypoints']} pontos com maior resposta"
+    captions = []
+    for method in methods:
+        f = extract_features(method, pair.gray1, cfg)
+        fig = plot_keypoints(pair.bgr1, f.kps, f"{method} — {len(f.kps)} keypoints", "GRAF — imagem 1")
+        path = save_figure(fig, folder / "keypoints" / file_name(method))
+
+        removed = ""
+        if f.n_detected != len(f.kps):
+            detector, descriptor = method.split("+")
+            removed = (f"; o detetor {detector} encontrou {f.n_detected} e o descritor {descriptor} "
+                       f"descartou {f.n_detected - len(f.kps)} junto à borda")
+        captions.append((path, f"Keypoints de {method} na imagem 1 do GRAF ({w}×{h} px): {len(f.kps)} pontos "
+                               f"({limit}{removed}). Cada círculo marca a posição de um keypoint; o tamanho "
+                               f"do círculo é fixo e não representa a escala nem a orientação. Eixos em píxeis."))
+    return captions
 
 
-def _num(x: float) -> str:
-    """Número com vírgula decimal (português)."""
-    return f"{x:g}".replace(".", ",")
-
-
-def _matching_protocol(cfg: dict) -> str:
-    m = cfg["matching"]
-    return f"ratio test {_num(m['ratio'])}" + (" + cross-check" if m.get("cross_check", True) else "")
-
-
-def _match_figures(pipelines, group: str, pair_label: str, label1: str, label2: str,
-                   img1, img2, gray1, gray2, H, cfg, out_dir):
-    """Uma figura de matches por pipeline. Devolve [(caminho, legenda)]."""
+def match_figures(methods, pair, img1, imgk, label1: str, labelk: str, pair_name: str, cfg: dict,
+                  folder: Path) -> list:
+    """Uma figura por método com os matches do par, verdes se corretos. Devolve [(ficheiro, legenda)]."""
     eps = cfg["eval"]["eps_px"]
-    res = []
-    for p in pipelines:
-        f1, f2 = p.extract(gray1, cfg), p.extract(gray2, cfg)
-        mr = p.match(f1, f2, cfg)
-        good = match_errors(f1, f2, mr.matches, H) < eps
-        n, c = len(mr.matches), int(good.sum())
-        title = f"{p.name} — {pair_label}: {c} de {n} matches corretos ({_pct(c, n)})"
-        fig, shown = plot_matches(img1, img2, f1, f2, mr.matches, good, label1, label2, title,
-                                  good_label=f"correto (erro < {_num(eps)} px)", bad_label="errado",
-                                  max_draw=cfg["qualitative"]["max_matches_drawn"], seed=cfg["seed"])
-        path = save_figure(fig, out_dir / group / f"{_slug(p.name)}.jpg")
-        drawn = "todas as linhas mostradas" if shown == n else \
-            f"mostradas {shown} de {n} linhas (amostra aleatória que mantém a proporção certos/errados)"
-        caption = (f"Matches putativos de {p.name} entre a {label1.lower()} (esquerda) e a {label2.lower()} "
-                   f"(direita) — {pair_label} ({_matching_protocol(cfg)}). Verde: correto (erro com a "
-                   f"homografia ground-truth < {_num(eps)} px); vermelho: errado. {n} matches, {c} corretos "
-                   f"({_pct(c, n)}); {drawn}. Eixos em píxeis.")
-        res.append((path, caption))
-    return res
+    max_lines = cfg["qualitative"]["max_matches_drawn"]
+    captions = []
+    for method in methods:
+        f1 = extract_features(method, pair.gray1, cfg)
+        fk = extract_features(method, pair.grayk, cfg)
+        matches, _ = match_features(method, f1, fk, cfg)
+        good = match_errors(f1, fk, matches, pair.H) < eps
+
+        n, n_good = len(matches), int(good.sum())
+        percent = f"{100 * n_good / n:.0f} %" if n else "—"
+        title = f"{method} — {pair_name}: {n_good} de {n} matches corretos ({percent})"
+        fig, n_lines = plot_matches(img1, imgk, f1.kps, fk.kps, matches, good, label1, labelk, title,
+                                    good_label=f"correto (erro < {eps:g} px)", max_lines=max_lines,
+                                    seed=cfg["seed"])
+        path = save_figure(fig, folder / file_name(method))
+
+        if n_lines == n:
+            lines = "todas as linhas mostradas"
+        else:
+            lines = f"mostradas {n_lines} de {n} linhas (amostra aleatória que mantém a proporção certos/errados)"
+        ratio = f"{cfg['matching']['ratio']:g}".replace(".", ",")
+        captions.append((path, f"Matches putativos de {method} entre a {label1.lower()} (esquerda) e a "
+                               f"{labelk.lower()} (direita) — {pair_name} (ratio test {ratio} + cross-check). "
+                               f"Verde: correto (erro com a homografia ground-truth < {eps:g} px); vermelho: "
+                               f"errado. {n} matches, {n_good} corretos ({percent}); {lines}. Eixos em píxeis."))
+    return captions
 
 
-def write_captions(entries: list[tuple[Path, str]], path: Path) -> Path:
-    """Grava as legendas em Markdown: caminho relativo + texto."""
-    lines = ["# Legendas das figuras qualitativas", "",
-             "Geradas automaticamente por `python src/main.py --qualitative`. Os números são os desta corrida.", "",
-             "Numeração GRAF: imagem 1 = img1.ppm, imagem 2 = img2.ppm, imagem 3 = img4.ppm.", ""]
-    for p, cap in entries:
-        lines += [f"**{p.relative_to(path.parent).as_posix()}**", "", cap, ""]
-    path.write_text("\n".join(lines), encoding="utf-8")
-    return path
+def run_qualitative(methods, cfg: dict) -> None:
+    """Gera todas as figuras qualitativas e o ficheiro de legendas."""
+    folder = Path(cfg["paths"]["figures"]) / "qualitative"
+    graf = load_graf_pairs(cfg)
 
+    captions = keypoint_figures(methods, graf[0], cfg, folder)
 
-def run_qualitative(pipelines: list[Pipeline], cfg: dict) -> list[Path]:
-    """Gera todas as figuras qualitativas e o legendas.md. Devolve os caminhos gravados."""
-    out = Path(cfg["paths"]["figures"]) / "qualitative"
-    entries: list[tuple[Path, str]] = []
-    budget = cfg.get("max_keypoints")
+    for pair in graf:   # GRAF imagem 1 -> imagem 2 e imagem 1 -> imagem 3
+        captions += match_figures(methods, pair, pair.bgr1, pair.bgrk, "Imagem 1", f"Imagem {pair.k}",
+                                  f"GRAF 1→{pair.k}", cfg, folder / f"graf_1to{pair.k}")
 
-    # 1) keypoints na GRAF imagem 1
-    pr = load_graf_pair(cfg["paths"]["graf"], 2)
-    h, w = pr.gray1.shape
-    for p in pipelines:
-        f = p.extract(pr.gray1, cfg)
-        fig = plot_keypoints(pr.bgr1, f, f"{p.name} — {f.n} keypoints", "GRAF — imagem 1")
-        path = save_figure(fig, out / "keypoints" / f"{_slug(p.name)}.jpg")
-        lim = f"limite de {budget} pontos com maior resposta" if budget else "sem limite de pontos"
-        n_det = f.meta.get("n_detected", f.n)
-        removed = (f"; o detetor {f.meta.get('detector', '')} encontrou {n_det} e o descritor "
-                   f"{f.meta.get('descriptor', '')} descartou {n_det - f.n} junto à borda") if n_det != f.n else ""
-        entries.append((path, f"Keypoints de {p.name} na imagem 1 do GRAF ({w}×{h} px): {f.n} pontos "
-                              f"({lim}{removed}). Cada círculo marca a posição de um keypoint; o tamanho do "
-                              f"círculo é fixo e não representa a escala nem a orientação. Eixos em píxeis."))
+    synthetic = {(p.category, p.k): p for p in make_pairs(cfg)}
+    rot45, scale2 = synthetic[("rot", 45.0)], synthetic[("scale", 2.0)]
+    captions += match_figures(methods, rot45, rot45.gray1, rot45.grayk,
+                              "Imagem 1 (GRAF imagem 1, máscara circular)", "Imagem 2 (rodada 45°)",
+                              "rotação sintética de 45°", cfg, folder / "rot45")
+    captions += match_figures(methods, scale2, scale2.gray1, scale2.grayk,
+                              "Imagem 1 (GRAF imagem 1)", "Imagem 2 (escala 2×)",
+                              "escala sintética 2×", cfg, folder / "scale2")
 
-    # 2) matches GRAF imagem 1 -> imagem n (n = número no relatório: 2, 3)
-    for pr in load_graf_pairs(cfg["paths"]["graf"]):
-        n = pr.k
-        entries += _match_figures(pipelines, f"graf_1to{n}", f"GRAF 1→{n}", "Imagem 1", f"Imagem {n}",
-                                  pr.bgr1, pr.bgrk, pr.gray1, pr.grayk, pr.H, cfg, out)
-
-    # 3) pares sintéticos (D20): imagem 1 = base, imagem 2 = transformada
-    syn = {(p.category, p.k): p for p in make_pairs(cfg)}
-    for (cat, lvl), group, label1, label2, pair_label in (
-            (("rot", 45.0), "rot45", "Imagem 1 (GRAF imagem 1, máscara circular)",
-             "Imagem 2 (rodada 45°)", "rotação sintética de 45°"),
-            (("scale", 2.0), "scale2", "Imagem 1 (GRAF imagem 1)",
-             "Imagem 2 (escala 2×)", "escala sintética 2×")):
-        sp = syn[(cat, lvl)]
-        entries += _match_figures(pipelines, group, pair_label, label1, label2,
-                                  sp.gray1, sp.grayk, sp.gray1, sp.grayk, sp.H, cfg, out)
-
-    cap = write_captions(entries, out / "legendas.md")
-    return [p for p, _ in entries] + [cap]
+    save_captions(captions, folder / "legendas.md", "figuras qualitativas")
+    print(f"{len(captions)} figuras em {folder}")

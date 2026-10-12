@@ -25,7 +25,7 @@ Fast", IEEE TPAMI 34(7), 2012. Código: `src/brief_own.py`, parâmetros em `CFG[
 | 2 | [ECCV §3] "p(x) is the pixel intensity in a smoothed version of p" | As comparações são feitas na imagem suavizada (`smooth`), não na original | Igual |
 | 3 | [ECCV §3, Eq. 2] O descritor é a cadeia de n_d bits dos testes | `np.packbits(bits, axis=1)` → `uint8 (N, n_d/8)` | Igual (a ordem dos bits dentro de cada byte é a do NumPy; não altera a distância de Hamming) |
 | 4 | [ECCV §3] "we consider n_d = 128, 256, and 512"; BRIEF-k com k = n_d/8 bytes. [TPAMI §IV-A] "the default descriptor BRIEF-32" | `n_bits = 256` (BRIEF-32) | Igual |
-| 5 | [ECCV §3] "Choosing a set of n_d (x, y)-location pairs uniquely defines a set of binary tests" | `make_pairs` gera os pares uma vez (seed fixa, com cache) e os mesmos pares são usados em todos os keypoints e nas duas imagens | Igual |
+| 5 | [ECCV §3] "Choosing a set of n_d (x, y)-location pairs uniquely defines a set of binary tests" | `make_pairs` gera os pares com seed fixa: são sempre os mesmos, em todos os keypoints e nas duas imagens | Igual |
 | 6 | [ECCV §1, §4] Os descritores comparam-se com a distância de Hamming | `cv2.NORM_HAMMING` | Igual |
 
 ### 1.2 Suavização
@@ -93,8 +93,7 @@ valores por omissão foram lidos dos próprios objetos (`getThreshold()`, etc.),
 
 Outras funções do OpenCV usadas: `detect` e `compute` (em chamadas separadas, para medir os dois
 tempos), `perspectiveTransform`, `GaussianBlur`, `cvtColor`, `imdecode`/`imencode`,
-`getRotationMatrix2D`, `warpAffine`, `resize`, `setRNGSeed`, `setNumThreads`, `FlannBasedMatcher`
-(opção).
+`getRotationMatrix2D`, `warpAffine`, `resize`, `setRNGSeed`.
 
 ### 2.2 Parâmetros: config vs valores por omissão do OpenCV 4.13.0
 

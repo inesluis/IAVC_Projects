@@ -1,13 +1,11 @@
-"""Visualizações: keypoints, matches certos/errados, gráficos F1/F2, panoramas.  [A + B]
+"""Figuras para o relatório, feitas com o Matplotlib.  [A + B]
 
-Figuras matplotlib com eixos em píxeis e identificação de cada imagem (D21):
-  plot_keypoints  — posição dos keypoints numa imagem, marcador igual para todos os métodos
-  plot_matches    — duas imagens lado a lado; linhas verdes/vermelhas segundo uma máscara booleana
-                    (matches corretos vs errados com a H GT, ou inliers vs outliers do RANSAC)
-  plot_curves     — gráfico de linhas (estudos de parâmetros, curvas por nível)
-  plot_test_pattern — pares de teste de um descritor binário (BRIEF próprio)
-  plot_scatter    — dispersão com um ponto por método (compromisso exatidão vs tempo)
-  save_figure     — grava (PNG ou JPEG pela extensão) e fecha a figura
+  plot_keypoints     keypoints sobre uma imagem
+  plot_matches       duas imagens lado a lado com os matches (verde/vermelho)
+  plot_curves        gráfico de linhas
+  plot_scatter       gráfico de dispersão, um ponto por método
+  plot_test_pattern  pares de teste do BRIEF próprio
+  save_figure, save_captions
 """
 
 from pathlib import Path
@@ -16,22 +14,21 @@ import cv2
 import matplotlib
 import numpy as np
 
-matplotlib.use("Agg")            # sem janelas: só gravar ficheiros
+matplotlib.use("Agg")   # só grava ficheiros, não abre janelas
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 from matplotlib.patches import ConnectionPatch  # noqa: E402
 from matplotlib.ticker import NullLocator  # noqa: E402
 
-from interface import Features  # noqa: E402
+from interface import keypoints_to_array  # noqa: E402
 
 GREEN = "#00b400"
 RED = "#ff2020"
 YELLOW = "#ffd400"
 
 
-def _show(ax, img: np.ndarray, title: str) -> None:
-    """Mostra uma imagem (cinzento ou BGR) com eixos em píxeis. Os centros dos píxeis ficam nas
-    coordenadas inteiras, a mesma convenção dos keypoints do OpenCV."""
+def show_image(ax, img, title: str) -> None:
+    """Mostra uma imagem (cinzento ou BGR) com os eixos em píxeis."""
     if img.ndim == 2:
         ax.imshow(img, cmap="gray", vmin=0, vmax=255)
     else:
@@ -42,71 +39,110 @@ def _show(ax, img: np.ndarray, title: str) -> None:
     ax.tick_params(labelsize=8)
 
 
-def plot_keypoints(img: np.ndarray, f: Features, title: str, img_label: str):
-    """Figura com TODOS os keypoints de f sobre img, com o mesmo marcador para todos os métodos.
-    O marcador não representa escala nem orientação: comparam-se número e distribuição espacial."""
+def plot_keypoints(img, kps, title: str, image_label: str):
+    """Todos os keypoints sobre a imagem, com o mesmo marcador para todos os métodos.
+    O marcador não mostra a escala nem a orientação: compara-se o número e a distribuição (D21)."""
     h, w = img.shape[:2]
     fig, ax = plt.subplots(figsize=(7, 7 * h / w + 0.5), layout="constrained")
-    _show(ax, img, img_label)
-    pts = f.points()
-    ax.scatter(pts[:, 0], pts[:, 1], s=14, facecolors="none", edgecolors=YELLOW, linewidths=0.8)
+    show_image(ax, img, image_label)
+    points = keypoints_to_array(kps)
+    ax.scatter(points[:, 0], points[:, 1], s=14, facecolors="none", edgecolors=YELLOW, linewidths=0.8)
     fig.suptitle(title, fontsize=12)
     return fig
 
 
-def plot_matches(img1: np.ndarray, img2: np.ndarray, f1: Features, f2: Features, matches,
-                 good: np.ndarray | None, label1: str, label2: str, title: str,
-                 good_label: str = "correto", bad_label: str = "errado",
-                 max_draw: int | None = 150, seed: int = 0):
-    """Figura com as duas imagens lado a lado (eixos próprios) e uma linha por match.
+def plot_matches(img1, img2, kps1, kps2, matches, good, label1: str, label2: str, title: str,
+                 good_label: str = "correto", bad_label: str = "errado", max_lines: int = 150, seed: int = 0):
+    """Duas imagens lado a lado, com uma linha por match: verde se good[i], vermelho se não.
 
-    good: máscara booleana (len(matches)) -> verde se True, vermelho se False; None -> tudo verde.
-    max_draw: nº máximo de linhas (amostra aleatória com seed fixa, mantém a proporção certo/errado).
-    Os errados são desenhados por cima. Devolve (fig, nº de linhas desenhadas).
+    `good` é uma máscara booleana: matches corretos (pela H ground-truth) ou inliers do RANSAC.
+    Com muitos matches desenha-se uma amostra aleatória de max_lines, que mantém a proporção.
+    Devolve (figura, nº de linhas desenhadas).
     """
     h = max(img1.shape[0], img2.shape[0])
     w = img1.shape[1] + img2.shape[1]
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 13 * h / w + 0.9), layout="constrained")
-    _show(ax1, img1, label1)
-    _show(ax2, img2, label2)
-    ax2.yaxis.tick_right()                      # eixo y da 2.ª imagem à direita: as linhas não o tapam
+    show_image(ax1, img1, label1)
+    show_image(ax2, img2, label2)
+    ax2.yaxis.tick_right()                   # eixo y da 2.ª imagem à direita, para as linhas não o taparem
     ax2.yaxis.set_label_position("right")
 
-    n = len(matches)
-    good = np.ones(n, bool) if good is None else np.asarray(good, bool)
-    idx = np.arange(n)
-    if max_draw is not None and n > max_draw:
-        idx = np.sort(np.random.default_rng(seed).choice(n, max_draw, replace=False))
-    for want in (True, False):                       # verdes primeiro, vermelhos por cima
-        col = GREEN if want else RED
-        sel = idx[good[idx] == want]
-        if len(sel) == 0:
-            continue
-        p = np.array([f1.kps[matches[i].queryIdx].pt for i in sel])
-        q = np.array([f2.kps[matches[i].trainIdx].pt for i in sel])
-        ax1.scatter(p[:, 0], p[:, 1], s=12, facecolors="none", edgecolors=col, linewidths=0.8)
-        ax2.scatter(q[:, 0], q[:, 1], s=12, facecolors="none", edgecolors=col, linewidths=0.8)
-        for a, b in zip(p, q):
-            fig.add_artist(ConnectionPatch(xyA=a, coordsA=ax1.transData, xyB=b, coordsB=ax2.transData,
-                                           color=col, linewidth=0.7, alpha=0.85))
+    good = np.asarray(good, dtype=bool)
+    shown = np.arange(len(matches))
+    if len(matches) > max_lines:
+        shown = np.sort(np.random.default_rng(seed).choice(len(matches), max_lines, replace=False))
+
+    for is_good, color in ((True, GREEN), (False, RED)):   # os errados por cima, para se verem
+        for i in shown[good[shown] == is_good]:
+            p = kps1[matches[i].queryIdx].pt
+            q = kps2[matches[i].trainIdx].pt
+            ax1.scatter(*p, s=12, facecolors="none", edgecolors=color, linewidths=0.8)
+            ax2.scatter(*q, s=12, facecolors="none", edgecolors=color, linewidths=0.8)
+            fig.add_artist(ConnectionPatch(xyA=p, coordsA=ax1.transData, xyB=q, coordsB=ax2.transData,
+                                           color=color, linewidth=0.7, alpha=0.85))
+
     handles = [Line2D([], [], color=GREEN, lw=2, label=good_label)]
-    if good is not None and (~good).any():
+    if (~good).any():
         handles.append(Line2D([], [], color=RED, lw=2, label=bad_label))
     fig.legend(handles=handles, loc="outside lower center", ncol=len(handles), fontsize=10, frameon=False)
     fig.suptitle(title, fontsize=12)
-    return fig, len(idx)
+    return fig, len(shown)
+
+
+def plot_curves(series, xlabel: str, ylabel: str, title: str, hlines=(), logx: bool = False,
+                logy: bool = False, xticks=None, xticklabels=None, ylim=None):
+    """Gráfico de linhas.
+    series: lista de dicionários com "x", "y", "label" e, opcionalmente, "style" e "color".
+    hlines: linhas horizontais de referência, dicionários com "y" e "label"."""
+    fig, ax = plt.subplots(figsize=(7, 4.6), layout="constrained")
+    for s in series:
+        ax.plot(s["x"], s["y"], s.get("style", "-o"), label=s["label"], color=s.get("color"),
+                linewidth=1.6, markersize=5)
+    for line in hlines:
+        ax.axhline(line["y"], color="black", linestyle=(0, (1, 2)), linewidth=1.4, label=line["label"])
+    if logx:
+        ax.set_xscale("log")
+    if logy:
+        ax.set_yscale("log")
+    if xticks is not None:
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xticklabels if xticklabels is not None else [f"{v:g}" for v in xticks])
+        ax.xaxis.set_minor_locator(NullLocator())   # só os ticks pedidos
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title, fontsize=11)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    return fig
+
+
+def plot_scatter(points, xlabel: str, ylabel: str, title: str, logx: bool = False):
+    """Gráfico de dispersão com um ponto por método.
+    points: lista de dicionários com "x", "y", "label", "color" e "marker"."""
+    fig, ax = plt.subplots(figsize=(7, 4.6), layout="constrained")
+    for p in points:
+        ax.scatter(p["x"], p["y"], s=80, color=p["color"], marker=p["marker"], label=p["label"], zorder=3)
+    ax.legend(fontsize=8)
+    if logx:
+        ax.set_xscale("log")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title, fontsize=11)
+    ax.grid(True, which="both", alpha=0.3)
+    return fig
 
 
 def plot_test_pattern(pairs: np.ndarray, patch_size: int, title: str):
-    """Padrão de testes de um descritor binário: um segmento por par (x_i, y_i), em coordenadas do
-    patch (origem no centro, píxeis). pairs: (n, 4) com (x1, y1, x2, y2)."""
+    """Pares de teste de um descritor binário: um segmento por par, em coordenadas do patch."""
     half = patch_size / 2
     fig, ax = plt.subplots(figsize=(5, 5.3), layout="constrained")
     for x1, y1, x2, y2 in pairs:
         ax.plot([x1, x2], [y1, y2], color="#1f77b4", linewidth=0.7, alpha=0.7)
     ax.scatter(pairs[:, [0, 2]].ravel(), pairs[:, [1, 3]].ravel(), s=4, color="black", zorder=3)
     ax.set_xlim(-half - 1, half + 1)
-    ax.set_ylim(half + 1, -half - 1)          # y para baixo, como na imagem
+    ax.set_ylim(half + 1, -half - 1)   # y cresce para baixo, como na imagem
     ax.set_aspect("equal")
     ax.set_xlabel("x (px, relativo ao centro do patch)")
     ax.set_ylabel("y (px, relativo ao centro do patch)")
@@ -115,60 +151,22 @@ def plot_test_pattern(pairs: np.ndarray, patch_size: int, title: str):
     return fig
 
 
-def plot_curves(series: list[dict], xlabel: str, ylabel: str, title: str, hlines: list[dict] = (),
-                logx: bool = False, logy: bool = False, xticks=None, xticklabels=None, ylim=None):
-    """Gráfico de linhas. series: [{"x", "y", "label", "style"(opcional, ex. "-o"), "color"(opcional)}];
-    hlines: [{"y", "label"}] linhas horizontais de referência (pontilhado preto);
-    xticklabels: rótulos dos xticks (omissão: os valores); ylim: (mín, máx) do eixo y."""
-    fig, ax = plt.subplots(figsize=(7, 4.6), layout="constrained")
-    for s in series:
-        ax.plot(s["x"], s["y"], s.get("style", "-o"), label=s["label"], color=s.get("color"),
-                linewidth=1.6, markersize=5)
-    for h in hlines:
-        ax.axhline(h["y"], color="black", linestyle=(0, (1, 2)), linewidth=1.4, label=h["label"])
-    if logx:
-        ax.set_xscale("log")
-    if logy:
-        ax.set_yscale("log")
-    if xticks is not None:
-        ax.set_xticks(xticks)
-        ax.set_xticklabels(xticklabels if xticklabels is not None else [f"{v:g}" for v in xticks])
-        ax.xaxis.set_minor_locator(NullLocator())     # só os ticks pedidos no eixo x
-    if ylim is not None:
-        ax.set_ylim(*ylim)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title, fontsize=11)
-    ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=8)
-    return fig
-
-
-def plot_scatter(points: list[dict], xlabel: str, ylabel: str, title: str, logx: bool = False, ylim=None):
-    """Gráfico de dispersão com um ponto por método, identificado na legenda (cor e marcador).
-    points: [{"x", "y", "label", "color"(opcional), "marker"(opcional)}]."""
-    fig, ax = plt.subplots(figsize=(7, 4.6), layout="constrained")
-    for p in points:
-        ax.scatter(p["x"], p["y"], s=80, color=p.get("color"), marker=p.get("marker", "o"),
-                   label=p["label"], zorder=3)
-    ax.legend(fontsize=8)
-    if logx:
-        ax.set_xscale("log")
-    if ylim is not None:
-        ax.set_ylim(*ylim)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title, fontsize=11)
-    ax.grid(True, which="both", alpha=0.3)
-    return fig
-
-
-def save_figure(fig, path: str | Path, dpi: int = 150, jpeg_quality: int = 92) -> Path:
-    """Grava a figura (cria a pasta) e fecha-a. Formato pela extensão; .jpg usa jpeg_quality
-    (fotografias ficam ~4-5x mais leves do que em PNG)."""
+def save_figure(fig, path) -> Path:
+    """Grava a figura (PNG ou JPEG, pela extensão), cria a pasta se for preciso, e fecha-a."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    extra = {"pil_kwargs": {"quality": jpeg_quality}} if path.suffix.lower() in (".jpg", ".jpeg") else {}
-    fig.savefig(path, dpi=dpi, **extra)
+    if path.suffix == ".jpg":
+        fig.savefig(path, dpi=150, pil_kwargs={"quality": 92})   # fotografias: bem mais leve que PNG
+    else:
+        fig.savefig(path, dpi=150)
     plt.close(fig)
     return path
+
+
+def save_captions(captions, path, title: str) -> None:
+    """Grava as legendas das figuras num ficheiro Markdown. captions: [(ficheiro, texto), ...]."""
+    path = Path(path)
+    lines = [f"# Legendas — {title}", "", "Geradas automaticamente com os números da corrida.", ""]
+    for figure_path, text in captions:
+        lines += [f"**{figure_path.relative_to(path.parent).as_posix()}**", "", text, ""]
+    path.write_text("\n".join(lines), encoding="utf-8")

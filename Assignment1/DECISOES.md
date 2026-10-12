@@ -10,6 +10,10 @@ Legenda de estado: **Implementada** · **Acordada** (decidida, ainda por impleme
 
 ## Decisões importantes / fora do comum (rever se necessário)
 
+Nota: o código foi simplificado em 2026-10-12 (D27). As entradas D01–D26 foram escritas antes e
+podem referir nomes de funções antigos; a tabela de correspondência está na D27. Esta tabela usa os
+nomes atuais.
+
 Lista das escolhas que **não vêm diretamente do enunciado** ou que **se desviam do procedimento mais
 óbvio**. Cada uma pode mudar os números do relatório. Para cada uma: o que foi feito, porquê, e
 **como voltar atrás**. Os detalhes estão na entrada `Dxx` indicada.
@@ -22,13 +26,13 @@ Lista das escolhas que **não vêm diretamente do enunciado** ou que **se desvia
 | 4 | **Estudo do FAST: "repetibilidade ao acaso"** medida com a H ground-truth deslocada 20 px | Com muitos pontos a repetibilidade sobe por coincidência; é preciso um nível de referência | Remover a coluna `repeatability_chance`; os deslocamentos estão em `CFG["fast_study"]["chance_shifts_px"]` | D24 |
 | 5 | **Rotação e escala avaliadas num teste sintético** (GRAF imagem 1 rodada/escalada), não no HPatches | O HPatches só separa iluminação e ponto de vista; o professor pediu a discussão das 4 categorias | Não correr `--rotscale`; níveis em `CFG["synthetic"]` | D19, D20 |
 | 6 | **Controlos (0° e escala 1,0) fora das médias** de rotação/escala | São triviais (precisão 1,0) e inflacionariam a média | Em `evaluation.summarize`, não filtrar a coluna `control` | D20 |
-| 7 | **Máscara circular na imagem do teste de rotação** | Sem ela, rodar cria cantos pretos e perde conteúdo, o que gera keypoints falsos | `rot_scale_study.make_pairs`: não aplicar `circular_feather` | D20 |
-| 8 | **GRAF `img4.ppm` chama-se "Imagem 3"** nas figuras, legendas e tabelas | Só há 3 imagens GRAF; numeração 1, 2, 3 no relatório (pedido da Carolina) | `datasets.GRAF_REPORT_NUMBER = {2: 2, 4: 4}` | D21 |
+| 7 | **Máscara circular na imagem do teste de rotação** | Sem ela, rodar cria cantos pretos e perde conteúdo, o que gera keypoints falsos | `rot_scale_study.make_pairs`: não aplicar `circular_mask` | D20 |
+| 8 | **GRAF `img4.ppm` chama-se "Imagem 3"** nas figuras, legendas e tabelas | Só há 3 imagens GRAF; numeração 1, 2, 3 no relatório (pedido da Carolina) | Em `datasets.py`, mudar as chaves de `GRAF_FILES` e `GRAF_HOMOGRAPHIES` de 3 para 4 | D21 |
 | 9 | **Correspondências ground-truth por emparelhamento 1-para-1 máximo** (não o método guloso do código de arranque) | Garante N_correct ≤ N_corresp e recall ≤ 1 | Trocar o cálculo em `evaluation.gt_correspondences` | D17 |
-| 10 | **Limite de 2000 keypoints por imagem** nas experiências principais (maior confiança primeiro) | Comparação justa entre métodos; o enunciado avisa que mais pontos não significa melhor | `--max-kps none` ou `CFG["max_keypoints"] = None` | D05 |
+| 10 | **Limite de 2000 keypoints por imagem** nas experiências principais (maior confiança primeiro) | Comparação justa entre métodos; o enunciado avisa que mais pontos não significa melhor | `CFG["max_keypoints"] = None` | D05 |
 | 11 | **Precisão = 0 quando não há matches** (em vez de "não definida") | Um método que não emparelha nada falhou nesse par; ignorar o par inflacionaria a média | `evaluation.evaluate_pair`: devolver NaN | D18 |
 | 12 | **N_features conta todos os keypoints da imagem 1** (não só os da zona comum) | Definição literal de PMR e matching score; o enunciado deixa a escolha aos alunos | `evaluation.evaluate_pair`: usar `N_vis1` | D02 |
-| 13 | **Deteção e descrição em chamadas separadas** para medir os dois tempos | O enunciado pede tempos separados; no SIFT/KAZE a soma fica maior do que um `detectAndCompute` | `descriptors.extract_classic` | D06 |
+| 13 | **Deteção e descrição em chamadas separadas** para medir os dois tempos | O enunciado pede tempos separados; no SIFT/KAZE a soma fica maior do que um `detectAndCompute` | `descriptors.extract` | D06 |
 | 14 | **Keypoints nas figuras com marcador fixo** (sem escala nem orientação) e **amostra de 150 linhas** nos matches | Os círculos à escala do ORB tapavam a imagem; com todas as linhas não se via nada | `visualization.plot_keypoints`; `CFG["qualitative"]["max_matches_drawn"]` | D21 |
 | 15 | **Métricas da homografia (T4) ainda não existem** | Dependem do `homography.py` da Inês; decidido não implementar nada sobre código por fazer | Implementar quando existir | P05 |
 | 16 | **BRIEF próprio: patch S = 48 px** | Nenhuma das versões do artigo (ECCV 2010, TPAMI 2012) dá um valor para S; 48 é o do BRIEF do OpenCV (margem medida de 28 px) | `CFG["brief_own"]["patch_size"]` | D25 |
@@ -687,6 +691,156 @@ Pontos e tempo: 285 pares `i`, 295 pares `v`. Repetibilidade: 188 pares `i`, 113
     os rápidos (< 70 ms), o ORB é o melhor em ponto de vista. Base para a discussão "tempo real vs
     exatidão" pedida no enunciado (a completar com os métodos aprendidos da Pessoa B).
 
+### D27 — Simplificação do código (2026-10-12)
+- **Estado:** Implementada
+- **Decisão:** reescrever o código com a mesma organização em ficheiros e os mesmos cálculos, mas com
+  estruturas mais simples: funções diretas em vez de classes e registos, sem opções que nunca foram
+  usadas, e comentários curtos. Nomes de funções em inglês, comentários em português.
+- **Justificação:** o código tinha mais maquinaria do que o trabalho precisa. Um código mais simples
+  é mais fácil de explicar, de defender e de alterar.
+- **O que saiu:**
+  - `interface.py`: as classes `MatchResult` e `Pipeline`, os `Protocol` e as propriedades. Fica a
+    classe `Features` só com campos, e duas funções (`keypoints_to_array`, `descriptor_size`).
+  - `methods.py`: o registo de pipelines (`PIPELINES`, `register`, `functools.partial`). Ficam duas
+    listas de nomes e duas funções (`extract_features`, `match_features`).
+  - `brief_own.py`: a classe `BriefOwn` e a cache. Ficam `make_pairs` e `compute_brief`.
+  - `matching.py`: a opção FLANN e a função `mutual_nn`, nunca usadas nas experiências. Fica o
+    `BFMatcher` com ratio test + cross-check.
+  - `evaluation.py`: a captura de erros por par (em 3480 linhas nunca houve nenhum) e as colunas
+    `error`, `joint_timing`, `binary`, `matcher` e `mean_err_correct_px`.
+  - `main.py`: as opções `--pipelines`, `--max-kps` e `--reuse-raw`. Ficam `--tag` e `--seqs`.
+  - `config.py`: `num_threads` (D12) e `matching.backend`/`flann_checks`/`cross_check`.
+- **O que ficou, mesmo sendo menos simples, porque mudaria os resultados ou criaria erros:**
+  correspondências ground-truth por emparelhamento máximo com KD-tree (D17, D24); leitura de imagens
+  com `np.fromfile` + `imdecode` (D08); aquecimento antes de medir tempos (D06); limite de 2000 pontos
+  (D05); regras do estudo do FAST (D24).
+- **Tamanho:** de 1921 para 1548 linhas em `src/`.
+- **Nomes que mudaram** (as entradas anteriores deste documento usam os nomes antigos):
+
+  | Antes | Agora |
+  |---|---|
+  | `descriptors.extract_classic(combo, gray, cfg)` | `descriptors.extract(method, gray, cfg)` ou `methods.extract_features` |
+  | `descriptors.parse_combo` | `descriptors.split_method` |
+  | `detectors.cap_keypoints` | `detectors.keep_strongest` |
+  | `matching.match_descriptors` → `MatchResult` | `matching.match_descriptors` → `(matches, t_match)` |
+  | `matching.matches_to_points` | `matching.matched_points` |
+  | `Features.points()`, `.desc_dim`, `.desc_bytes` | `interface.keypoints_to_array(kps)`, `interface.descriptor_size(desc)` |
+  | `Features.meta["n_detected"]` | `Features.n_detected` |
+  | `methods.get_pipelines`, `DEFAULT_PIPELINES`, `BRIEF_OWN_COMBOS` | `methods.CLASSIC_METHODS`, `methods.BRIEF_OWN_METHODS` |
+  | `brief_own.BriefOwn(strategy, cfg).compute` | `brief_own.compute_brief(gray, kps, pairs, cfg)` |
+  | `brief_own.make_pairs(strategy, S, n_bits, seed, polar_radii)` | `brief_own.make_pairs(strategy, cfg)` |
+  | `datasets.iter_hpatches_pairs(root, ...)` | `datasets.hpatches_pairs(cfg, only)` |
+  | `datasets.GRAF_REPORT_NUMBER`, `load_graf_pair` | `datasets.GRAF_FILES`, `load_graf_pairs(cfg)` |
+  | `rot_scale_study.SyntheticPair`, `circular_feather`, `run_rot_scale` | `datasets.ImagePair` (com `control`), `circular_mask`, `evaluate_pairs(methods, make_pairs(cfg), cfg)` |
+  | `evaluation.run_hpatches`, `_warm_up` | `evaluate_pairs(methods, hpatches_pairs(cfg), cfg)`, `warm_up` |
+  | coluna `pipeline` nos CSV | coluna `method` |
+  | `config.setup_env`, `get_config(max_keypoints=...)` | `config.set_seeds`, `get_config()` |
+  | `visualization.plot_matches(img1, img2, f1, f2, ...)` | `plot_matches(img1, img2, kps1, kps2, matches, good, ...)` |
+- **Verificação de que os resultados não mudaram:** ver a subsecção seguinte.
+- **Teste de sanidade (`tests/test_sanity.py`, antes só um esqueleto):** imagem contra si própria
+  (repetibilidade e precisão = 1 nos 10 métodos); par com homografia conhecida (precisão > 0,9, recall
+  ≤ 1, MS = PMR × precisão); pares do BRIEF determinísticos e dentro do patch.
+  - **Achado:** no BRIEF-GV, com a mesma imagem, o recall é 0,9987 e não 1. A G V é menos
+    distintiva: alguns pontos diferentes ficam com descritores exatamente iguais, e o ratio test
+    rejeita-os (os dois melhores vizinhos estão à mesma distância). A precisão é 1. O teste exige
+    recall > 0,99.
+
+### D28 — Resultados atuais (corrida de 2026-10-12: FAST a 10, código simplificado)
+- **Estado:** Feita. **Estes números substituem os das entradas D22, D23, D25 e D26**, que eram da
+  corrida com o FAST a threshold 20. SIFT, ORB e KAZE não mudaram; só as configurações FAST+X.
+- **Comandos:** `--part1`, `--rotscale`, `--robustness`, `--graf`, `--brief`, `--fast`,
+  `--qualitative`, `--curves`, todos com `--tag classic`. Ficheiros em `results/` (fora do git).
+- **Verificação da simplificação (D27):** os CSV por par do código simplificado foram comparados,
+  linha a linha, com os do código antigo (ambos com o FAST a 10; ficheiros `ref_*.csv`):
+
+  | Experiência | linhas | colunas comparadas | maior diferença |
+  |---|---|---|---|
+  | HPatches (`classic_raw.csv`) | 3480 | 19 | 0 |
+  | Rotação/escala (`classic_rotscale_raw.csv`) | 138 | 19 | 0 |
+  | GRAF (`classic_graf_raw.csv`) | 12 | 19 | 0 |
+  | BRIEF próprio (`classic_brief_raw.csv`) | 3015 | 19 | 0 |
+  | Estudo do FAST (`classic_fast_raw.csv`) | 5220 | 8 | 0 |
+
+  Compararam-se todas as contagens e métricas; os tempos ficaram de fora, porque variam entre corridas.
+- **Efeito de passar o FAST de 20 para 10:** pequeno, como previsto. Com t = 10, 111 das 116
+  sequências atingem o limite de 2000 pontos na imagem 1 (com t = 20 eram 94; mínimo 915 pontos,
+  antes 128). Exemplo, FAST+BRIEF: precisão 0,777 → 0,776 em `i` e 0,602 → 0,597 em `v`.
+
+#### Tabela de robustez (precisão / matching score por categoria) e custo
+
+| Método | prec. `i` | prec. `v` | prec. `rot` | prec. `scale` | MS `i` | MS `v` | tempo por par (ms) |
+|---|---|---|---|---|---|---|---|
+| SIFT | 0,735 | 0,747 | 0,995 | 0,974 | 0,191 | 0,200 | 328 |
+| KAZE | 0,780 | 0,743 | 0,990 | 0,940 | 0,226 | 0,173 | 1262 |
+| ORB | 0,696 | 0,686 | 0,922 | 0,943 | 0,154 | 0,133 | 43 |
+| FAST+BRIEF | 0,776 | 0,597 | 0,080 | 0,551 | 0,244 | 0,125 | 33 |
+| FAST+BRISK | 0,739 | 0,546 | 0,987 | 0,494 | 0,169 | 0,079 | 51 |
+| FAST+FREAK | 0,674 | 0,542 | 0,983 | 0,568 | 0,158 | 0,086 | 73 |
+
+Tempos por imagem (ms), deteção / descrição: SIFT 87,5 / 69,8; KAZE 349 / 278; ORB 9,6 / 6,0;
+FAST+BRIEF 7,2 / 4,0; FAST+BRISK 7,1 / 12,5; FAST+FREAK 7,0 / 23,9. Matching por par: 7,6–13,4 ms.
+Tempo total por par em `i` / `v`: FAST+BRIEF 29 / 37; ORB 38 / 48; FAST+BRISK 47 / 56; FAST+FREAK
+69 / 77; SIFT 285 / 369; KAZE 1118 / 1402.
+
+- **As conclusões das entradas anteriores mantêm-se:** FAST+BRIEF é dos melhores em iluminação e o
+  pior em rotação; os FAST+X caem em escala e em ponto de vista; SIFT é o mais robusto; em iluminação
+  o FAST+BRIEF é o mais rápido e o de maior matching score; em ponto de vista o SIFT tem o maior
+  matching score e, entre os rápidos, o ORB é o melhor.
+
+#### GRAF por par (D23)
+
+| Método | precisão 1→2 | precisão 1→3 | matches corretos 1→3 | repetibilidade 1→2 | repetibilidade 1→3 |
+|---|---|---|---|---|---|
+| SIFT | 0,963 | 0,492 | 32 de 65 | 0,652 | 0,542 |
+| ORB | 0,960 | 0,324 | 11 de 34 | 0,763 | 0,684 |
+| KAZE | 0,976 | 0,519 | 27 de 52 | 0,803 | 0,729 |
+| FAST+BRIEF | 0,667 | 0,000 | 0 de 15 | 0,703 | 0,687 |
+| FAST+BRISK | 0,943 | 0,386 | 27 de 70 | 0,748 | 0,759 |
+| FAST+FREAK | 0,938 | 0,438 | 28 de 64 | 0,718 | 0,704 |
+
+#### Curvas (D26)
+- **Ponto de vista, precisão de 1→2 a 1→6:** SIFT 0,89 → 0,59; KAZE 0,89 → 0,60; ORB 0,89 → 0,49;
+  FAST+BRIEF 0,78 → 0,41; FAST+BRISK 0,73 → 0,35; FAST+FREAK 0,71 → 0,36.
+- **Rotação:** FAST+BRIEF 0,83 (15°), 0,13 (30°) e 0 a partir de 45°; ORB 0,87–0,89 acima de 135°;
+  os restantes ≥ 0,98.
+- **Escala:** FAST+X ≥ 0,93 entre 0,8× e 1,25×, ≤ 0,33 a 0,6× e ≤ 0,27 a 1,75×; SIFT ≥ 0,95 em todos
+  os níveis; KAZE 0,79 e ORB 0,85 a 2×.
+
+#### BRIEF próprio (D25)
+
+| Descritor (com FAST) | prec. `i` | prec. `v` | MS `i` | MS `v` | recall `i` | recall `v` | prec. `rot` | prec. `scale` | t_desc (ms) |
+|---|---|---|---|---|---|---|---|---|---|
+| BRIEF OpenCV | 0,776 | 0,597 | 0,244 | 0,125 | 0,435 | 0,243 | 0,080 | 0,551 | 3,7 |
+| Próprio G I | 0,818 | 0,573 | 0,259 | 0,093 | 0,464 | 0,179 | 0,050 | 0,441 | 11,3 |
+| Próprio G II | 0,813 | 0,631 | 0,265 | **0,130** | 0,477 | **0,253** | 0,109 | **0,624** | 11,2 |
+| Próprio G III | **0,866** | **0,643** | **0,301** | 0,115 | **0,546** | 0,220 | 0,084 | 0,622 | 11,2 |
+| Próprio G V | 0,708 | 0,492 | 0,212 | 0,095 | 0,377 | 0,182 | 0,081 | 0,513 | 11,1 |
+
+Rotação a 15° / 30°: OpenCV 0,83 / 0,13; G I 0,59 / 0,00; G II 0,86 / 0,27; G III 0,85 / 0,12;
+G V 0,78 / 0,07. As conclusões da D25 mantêm-se: a G II fica ao nível do OpenCV e um pouco acima;
+a G V é a pior em precisão; a G III é a melhor em iluminação; a G I é a mais frágil em ponto de
+vista, escala e rotação; nenhuma estratégia aguenta rotações de 30°.
+
+#### Estudo do FAST (D24)
+- Nº de pontos e repetibilidade: iguais aos da corrida de 2026-10-09 (o estudo usa os seus próprios
+  thresholds).
+- **Tempos desta corrida mais altos** (~1,4×): FAST 0,4–5,2 ms por imagem; SIFT 130 ms (`i`) e 145 ms
+  (`v`), contra 78 e 101 ms em 2026-10-09. Ver a nota seguinte.
+
+#### Nota sobre a fiabilidade dos tempos
+- Os tempos variaram entre corridas feitas no mesmo dia, na mesma máquina e com o mesmo código:
+  uma primeira corrida completa deu tempos 1,3–1,5× mais altos em todos os métodos, a piorar ao longo
+  da corrida (SIFT: 479 ms por par nas primeiras 20 sequências, 796 ms nas últimas 20). O código
+  simplificado, corrido logo a seguir em 6 sequências com a máquina livre, deu os mesmos tempos do
+  código antigo. Na corrida final, a avaliação principal ficou a 0,95–0,97× da referência, mas o
+  estudo do FAST, que correu ~25 min depois do arranque, ficou ~1,4× mais lento.
+- **Causa provável, não confirmada:** carga de outros processos ou aquecimento do portátil em corridas
+  longas.
+- **Consequências:** (1) as contagens e métricas não são afetadas; (2) a ordem relativa dos métodos em
+  tempo mantém-se em todas as corridas; (3) os valores absolutos de tempo têm uma incerteza da ordem
+  de ±50%. **Para a corrida oficial (P10):** máquina ligada à corrente e sem outros programas, e
+  repetir as experiências sensíveis ao tempo (`--part1`, `--fast`) em separado, com a máquina fria.
+
 ## Ambiente e repositório
 
 ### D13 — Ambiente Python
@@ -744,9 +898,10 @@ Pontos e tempo: 285 pares `i`, 295 pares `v`. Repetibilidade: 188 pares `i`, 113
   `--robustness`, `--qualitative`, `--graf`, `--fast`, `--brief` e `--curves`. Falta `--part2`
   (Pessoa B).
 - **P09 (2026-10-12)** — ~~Threshold do FAST: 20 ou 10~~ Resolvido no mesmo dia: passa a 10 (D09).
-- **P10 (2026-10-12)** — **Repetir as corridas** depois da mudança do threshold do FAST e da
-  simplificação do código: `--part1`, `--rotscale`, `--robustness`, `--graf`, `--qualitative`,
-  `--brief`, `--curves`. Até lá, os números das configurações FAST+X em D22, D23, D25 e D26 e as
-  tabelas/figuras em `results/` são da versão com t = 20.
+- **P10 (2026-10-12)** — ~~Repetir as corridas depois da mudança do threshold do FAST e da
+  simplificação~~ Feito no mesmo dia: os resultados atuais estão na D28 e em `results/`. Os números das
+  configurações FAST+X nas entradas D22, D23, D25 e D26 são da versão com t = 20 e ficam como registo
+  histórico. **Falta a corrida oficial**, com os métodos da Pessoa B e a T4, e com os cuidados de
+  medição de tempos descritos na D28.
 - **P08 (2026-10-08)** — ~~Análise qualitativa GRAF~~ feita (D21). Falta decidir se as figuras
   (30 JPEG, ≈ 13 MB) vão para o git ou se se geram só para a entrega.

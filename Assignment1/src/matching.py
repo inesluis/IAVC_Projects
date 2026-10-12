@@ -1,89 +1,46 @@
-"""Matching de descritores: ratio test + cross-check, vizinho mais próximo mútuo, (FLANN).  [Pessoa A]
-
-Todos os matchers devolvem matches 1-para-1 (queryIdx -> imagem 1, trainIdx -> imagem 2) num MatchResult.
-"""
+"""Matching de descritores: ratio test de Lowe + cross-check.  [Pessoa A]"""
 
 import time
 
 import cv2
 import numpy as np
 
-from interface import Features, MatchResult
+from interface import Features
 
 
-def _has_desc(f: Features) -> bool:
-    return f.desc is not None and len(f.desc) > 0
+def match_descriptors(f1: Features, f2: Features, cfg: dict):
+    """Emparelha os descritores da imagem 1 com os da imagem 2. Devolve (matches, tempo em ms).
 
-
-def _create_matcher(norm: int, binary: bool, cfg: dict):
-    """BFMatcher (exato) ou FlannBasedMatcher (aproximado) para a norma dada (D16).
-    FLANN: KD-trees para descritores float, LSH para binários."""
-    if cfg["matching"].get("backend", "bf") == "bf":
-        return cv2.BFMatcher(norm, crossCheck=False)
-    search = dict(checks=cfg["matching"].get("flann_checks", 50))
-    if binary:
-        index = dict(algorithm=6, table_number=6, key_size=12, multi_probe_level=1)   # FLANN_INDEX_LSH
-    else:
-        index = dict(algorithm=1, trees=5)                                            # FLANN_INDEX_KDTREE
-    return cv2.FlannBasedMatcher(index, search)
-
-
-def _backend_name(cfg: dict) -> str:
-    return cfg["matching"].get("backend", "bf").upper()
-
-
-def match_descriptors(f1: Features, f2: Features, cfg: dict) -> MatchResult:
-    """Ratio test de Lowe + cross-check (D16). Implementa o Matcher; serve float e binário.
-
-    1) para cada descritor de img1, os 2 vizinhos mais próximos em img2;
-    2) aceita se d1 < ratio * d2 (cfg["matching"]["ratio"], 0.8);
-    3) cross-check: aceita só se o melhor vizinho de img2 -> img1 for o mesmo ponto (1-para-1).
-    O tempo inclui as duas pesquisas (1->2 e 2->1).
+    Um match é aceite se passar os dois filtros (protocolo do enunciado, §2.8):
+      1. ratio test: a distância ao melhor vizinho é menor que ratio x a distância ao segundo;
+      2. cross-check: o melhor vizinho da imagem 2 para a imagem 1 é o mesmo ponto.
+    O resultado é 1-para-1. Em cada cv2.DMatch, queryIdx é o índice na imagem 1 e trainIdx na imagem 2.
     """
+    if f1.desc is None or f2.desc is None:
+        return [], 0.0
     ratio = cfg["matching"]["ratio"]
-    cross = cfg["matching"].get("cross_check", True)
-    name = f"{_backend_name(cfg)}-ratio{ratio}" + ("-xcheck" if cross else "")
-    if not (_has_desc(f1) and _has_desc(f2)):
-        return MatchResult([], 0.0, name)
-    if f1.norm != f2.norm:
-        raise ValueError(f"Normas diferentes: {f1.method} vs {f2.method}")
 
     t0 = time.perf_counter()
-    m = _create_matcher(f1.norm, f1.is_binary, cfg)
-    knn12 = m.knnMatch(f1.desc, f2.desc, k=2)
-    best21 = {}
-    if cross:
-        for pair in m.knnMatch(f2.desc, f1.desc, k=1):
-            if pair:
-                best21[pair[0].queryIdx] = pair[0].trainIdx
-    good = []
-    for pair in knn12:
-        if len(pair) < 2:          # img2 com 1 só ponto, ou LSH sem 2 vizinhos: ratio indefinido
+    matcher = cv2.BFMatcher(f1.norm)   # força bruta: Hamming nos binários, L2 nos float
+    two_best = matcher.knnMatch(f1.desc, f2.desc, k=2)
+    back = matcher.knnMatch(f2.desc, f1.desc, k=1)
+
+    # melhor vizinho de cada ponto da imagem 2 na imagem 1
+    best_in_1 = {m[0].queryIdx: m[0].trainIdx for m in back if m}
+
+    matches = []
+    for pair in two_best:
+        if len(pair) < 2:      # a imagem 2 só tem um ponto: o ratio não está definido
             continue
-        a, b = pair
-        if a.distance < ratio * b.distance and (not cross or best21.get(a.trainIdx) == a.queryIdx):
-            good.append(a)
-    t_match = (time.perf_counter() - t0) * 1e3
-    return MatchResult(good, t_match, name, meta={"ratio": ratio, "cross_check": cross})
+        best, second = pair
+        if best.distance < ratio * second.distance and best_in_1.get(best.trainIdx) == best.queryIdx:
+            matches.append(best)
+    t_match = (time.perf_counter() - t0) * 1000
+    return matches, t_match
 
 
-def mutual_nn(f1: Features, f2: Features, cfg: dict) -> MatchResult:
-    """Só vizinho mais próximo mútuo, sem ratio test. Alternativa para descritores aprendidos
-    (ex.: SuperPoint+MNN), onde o ratio 0.8 pode ser demasiado restritivo."""
-    name = f"{_backend_name(cfg)}-MNN"
-    if not (_has_desc(f1) and _has_desc(f2)):
-        return MatchResult([], 0.0, name)
-    t0 = time.perf_counter()
-    m = _create_matcher(f1.norm, f1.is_binary, cfg)
-    nn12 = [p[0] for p in m.knnMatch(f1.desc, f2.desc, k=1) if p]
-    best21 = {p[0].queryIdx: p[0].trainIdx for p in m.knnMatch(f2.desc, f1.desc, k=1) if p}
-    good = [a for a in nn12 if best21.get(a.trainIdx) == a.queryIdx]
-    t_match = (time.perf_counter() - t0) * 1e3
-    return MatchResult(good, t_match, name)
-
-
-def matches_to_points(f1: Features, f2: Features, matches) -> tuple[np.ndarray, np.ndarray]:
-    """Coordenadas (float64, (M, 2)) dos pontos emparelhados em img1 e img2."""
+def matched_points(f1: Features, f2: Features, matches):
+    """Coordenadas dos pontos emparelhados: dois arrays (M, 2), um por imagem."""
     p1 = np.array([f1.kps[m.queryIdx].pt for m in matches], dtype=np.float64).reshape(-1, 2)
     p2 = np.array([f2.kps[m.trainIdx].pt for m in matches], dtype=np.float64).reshape(-1, 2)
     return p1, p2

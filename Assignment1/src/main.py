@@ -1,209 +1,149 @@
-"""Ponto de entrada por linha de comando: --part1 | --fast | --brief | --part2 | --all.
+"""Ponto de entrada: um comando por experiência. Os resultados ficam em results/.
 
-Exemplos:
-    python src/main.py --part1                                  # HPatches completo, todos os pipelines
-    python src/main.py --part1 --seqs i_ajuntament v_graffiti   # teste rápido
-    python src/main.py --part1 --pipelines SIFT ORB --max-kps none --tag nolimit
-    python src/main.py --rotscale                               # teste sintético rotação/escala (GRAF img1)
-    python src/main.py --robustness --tag classic               # junta i, v, rot, scale numa tabela
-    python src/main.py --qualitative                            # figuras GRAF + sintético -> results/figures/
-    python src/main.py --graf --tag classic                     # métricas GRAF 1->2 e 1->3 (por par)
+    python src/main.py --part1          # HPatches: iluminação e ponto de vista (~15 min)
+    python src/main.py --rotscale       # teste sintético de rotação e escala
+    python src/main.py --robustness     # tabela com as 4 categorias (precisa dos dois anteriores)
+    python src/main.py --graf           # métricas nos pares GRAF 1->2 e 1->3
+    python src/main.py --qualitative    # figuras de keypoints e de matches
+    python src/main.py --fast           # estudo do FAST (~7 min)
+    python src/main.py --brief          # BRIEF próprio contra o BRIEF do OpenCV
+    python src/main.py --curves         # gráficos a partir das tabelas já calculadas
 
-# PENDENTE (2026-10-08): --fast e --brief (Pessoa A, por implementar), --part2 (Pessoa B).
+Opções: --tag NOME (prefixo dos ficheiros) e --seqs SEQ1 SEQ2 ... (só algumas sequências, para testar).
+
+# PENDENTE (2026-10-08): --part2 (stitching, Pessoa B).
 """
 
 import argparse
 
 import pandas as pd
 
-from config import get_config, setup_env
-from datasets import load_graf_pairs
-from evaluation import evaluate_pairs, run_hpatches, save_tables, summarize
-from methods import get_pipelines
-from studies.brief_study import BRIEF_STUDY_PIPELINES, plot_patterns
-from studies.brief_study import write_captions as write_brief_captions
-from studies.curves import load_raw, plot_level_curves, plot_tradeoff
-from studies.curves import write_captions as write_curve_captions
+from config import get_config, set_seeds
+from datasets import hpatches_pairs, load_graf_pairs
+from evaluation import evaluate_pairs, robustness_table, save_tables, summarize
+from methods import BRIEF_OWN_METHODS, CLASSIC_METHODS
+from studies.brief_study import plot_patterns
+from studies.curves import plot_level_curves, plot_tradeoff
 from studies.fast_study import plot_fast, run_fast_study, summarize_fast
-from studies.fast_study import write_captions as write_fast_captions
 from studies.qualitative import run_qualitative
-from studies.rot_scale_study import run_rot_scale
+from studies.rot_scale_study import make_pairs
+from visualization import save_captions
 
 
-def _cfg_from_args(args) -> dict:
-    max_kps = None if str(args.max_kps).lower() == "none" else int(args.max_kps)
-    cfg = get_config(max_keypoints=max_kps)
-    setup_env(cfg)
-    return cfg
-
-
-def _prefix(tag: str) -> str:
-    return f"{tag}_" if tag else ""
-
-
-def run_rotscale(args) -> None:
-    """Teste sintético -> results/tables/<tag>_rotscale_raw.csv e tabelas (categorias rot/scale)."""
-    cfg = _cfg_from_args(args)
-    prefix = _prefix(args.tag) + "rotscale_"
-    df = run_rot_scale(get_pipelines(args.pipelines), cfg)
+def run_part1(cfg, prefix, seqs):
+    """Avalia os métodos clássicos em todos os pares do HPatches."""
+    df = evaluate_pairs(CLASSIC_METHODS, hpatches_pairs(cfg, seqs), cfg)
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}raw.csv", index=False)
     tables = summarize(df)
     save_tables(tables, cfg["paths"]["tables"], prefix)
     print(tables["T2_matching"].round(3).to_string())
 
 
-GRAF_COLS = ["N_features", "N_putative", "N_correct", "N_corresp",
-             "PMR", "precision", "matching_score", "recall", "repeatability",
-             "t_det_ms", "t_desc_ms", "t_match_ms"]
-
-
-def run_graf(args) -> None:
-    """GRAF 1->2 e 1->3 (imagem 3 = img4.ppm), mesmo protocolo que o HPatches (D23).
-    Só 2 pares: a tabela mostra cada par (método x par), sem médias."""
-    cfg = _cfg_from_args(args)
-    prefix = _prefix(args.tag) + "graf_"
-    df = evaluate_pairs(get_pipelines(args.pipelines), load_graf_pairs(cfg["paths"]["graf"]), cfg)
-    df.to_csv(cfg["paths"]["tables"] / f"{prefix}raw.csv", index=False)
-    if (df["error"] != "").any():
-        print(df[df["error"] != ""][["pipeline", "k", "error"]].to_string())
-    t = df.assign(par=df["k"].map(lambda n: f"1->{n}")).set_index(["pipeline", "par"])[GRAF_COLS]
-    t.to_csv(cfg["paths"]["tables"] / f"{prefix}pairs.csv", float_format="%.4f")
-    print(t.round(3).to_string())
-
-
-def run_fast(args) -> None:
-    """Estudo do FAST (D24) -> <tag>_fast_raw.csv, <tag>_fast_T6.csv, figuras em results/figures/fast_study/."""
-    cfg = _cfg_from_args(args)
-    prefix = _prefix(args.tag) + "fast_"
-    raw = cfg["paths"]["tables"] / f"{prefix}raw.csv"
-    if args.reuse_raw and raw.exists():        # só refaz a tabela e as figuras (a corrida demora ~7 min)
-        df = pd.read_csv(raw)
-        df["nms"] = df["nms"].map({"True": True, "False": False, True: True, False: False})
-        print("reutilizado:", raw.name)
-    else:
-        df = run_fast_study(cfg, seqs=args.seqs)
-        df.to_csv(raw, index=False)
-    t6 = summarize_fast(df)
-    t6.to_csv(cfg["paths"]["tables"] / f"{prefix}T6.csv", float_format="%.4f")
-    print(t6.round(3).to_string())
-    fig_dir = cfg["paths"]["figures"] / "fast_study"
-    entries = plot_fast(df, cfg, fig_dir)
-    write_fast_captions(entries, fig_dir / "legendas.md")
-    print("figuras:", fig_dir)
-
-
-def run_robustness(args) -> None:
-    """Junta <tag>_raw.csv (HPatches) e <tag>_rotscale_raw.csv numa tabela pipeline x {i, v, rot, scale}."""
-    tables_dir = get_config()["paths"]["tables"]
-    p = _prefix(args.tag)
-    df = pd.concat([pd.read_csv(tables_dir / f"{p}raw.csv", keep_default_na=False, na_values=[""]),
-                    pd.read_csv(tables_dir / f"{p}rotscale_raw.csv", keep_default_na=False, na_values=[""])],
-                   ignore_index=True)
-    df["error"] = df["error"].fillna("")
-    df["control"] = df["control"].fillna(False).astype(bool)
-    rob = _robustness_table(summarize(df))
-    rob.to_csv(tables_dir / f"{p}robustness.csv", float_format="%.4f")
-    print(rob.round(3).to_string())
-
-
-def run_curves(args) -> None:
-    """Gráficos F1 (curvas por nível) e F2 (exatidão vs tempo) a partir dos CSV já calculados (D26).
-    Clássicos: <tag>_raw.csv + <tag>_rotscale_raw.csv -> results/figures/curves/
-    BRIEF próprio (se existir): <tag>_brief_raw.csv -> results/figures/curves_brief/"""
-    cfg = _cfg_from_args(args)
-    tables_dir, figs, p = cfg["paths"]["tables"], cfg["paths"]["figures"], _prefix(args.tag)
-    jobs = [("curves", "curvas dos métodos clássicos", [tables_dir / f"{p}raw.csv", tables_dir / f"{p}rotscale_raw.csv"]),
-            ("curves_brief", "curvas do BRIEF próprio", [tables_dir / f"{p}brief_raw.csv"])]
-    for folder, title, paths in jobs:
-        if not all(f.exists() for f in paths):
-            print(f"[{folder}] em falta: {[f.name for f in paths if not f.exists()]} — ignorado")
-            continue
-        df = load_raw(paths)
-        entries = plot_level_curves(df, cfg, figs / folder) + plot_tradeoff(df, cfg, figs / folder)
-        write_curve_captions(entries, figs / folder / "legendas.md", title)
-        print(f"[{folder}] {len(entries)} figuras em {figs / folder}")
-
-
-def _robustness_table(tables: dict) -> pd.DataFrame:
-    """pipeline x {i, v, rot, scale}: PMR, precision, matching score, recall, repetibilidade (D19)."""
-    rob = tables["T2_matching"][["PMR", "precision", "matching_score", "recall"]].join(
-        tables["T1_detection"][["repeatability"]]).unstack("category")
-    return rob.reindex(columns=["i", "v", "rot", "scale"], level=1)
-
-
-def run_brief(args) -> None:
-    """Estudo do BRIEF próprio (D25): FAST + BRIEF OpenCV vs FAST + BRIEF próprio (G I, II, III, V) nas
-    4 categorias -> <tag>_brief_raw.csv, <tag>_brief_T7.csv (+ T2, T5, F1) e figuras dos padrões."""
-    cfg = _cfg_from_args(args)
-    prefix = _prefix(args.tag) + "brief_"
-    tables_dir = cfg["paths"]["tables"]
-    pipelines = get_pipelines(BRIEF_STUDY_PIPELINES)
-    df = pd.concat([run_hpatches(pipelines, cfg, seqs=args.seqs), run_rot_scale(pipelines, cfg)],
-                   ignore_index=True)
-    df.to_csv(tables_dir / f"{prefix}raw.csv", index=False)
+def run_rotscale(cfg, prefix):
+    """Avalia os métodos clássicos no teste sintético de rotação e escala."""
+    df = evaluate_pairs(CLASSIC_METHODS, make_pairs(cfg), cfg)
+    df.to_csv(cfg["paths"]["tables"] / f"{prefix}rotscale_raw.csv", index=False)
     tables = summarize(df)
-    save_tables({k: tables[k] for k in ("T2_matching", "T5_cost", "F1_by_k", "errors")}, tables_dir, prefix)
-    t7 = _robustness_table(tables).reindex(list(BRIEF_STUDY_PIPELINES))
-    t7.to_csv(tables_dir / f"{prefix}T7.csv", float_format="%.4f")
-    print(t7.round(3).to_string())
-    fig_dir = cfg["paths"]["figures"] / "brief_own"
-    write_brief_captions(plot_patterns(cfg, fig_dir), fig_dir / "legendas.md")
-    print("figuras:", fig_dir)
-
-
-def run_part1(args) -> None:
-    """Avaliação no HPatches -> results/tables/<tag>raw.csv e tabelas agregadas."""
-    cfg = _cfg_from_args(args)
-    prefix = _prefix(args.tag)
-    tables_dir = cfg["paths"]["tables"]
-    df = run_hpatches(get_pipelines(args.pipelines), cfg, seqs=args.seqs,
-                      out_csv=tables_dir / f"{prefix}raw.csv")
-    tables = summarize(df)
-    save_tables(tables, tables_dir, prefix)
+    save_tables(tables, cfg["paths"]["tables"], prefix + "rotscale_")
     print(tables["T2_matching"].round(3).to_string())
-    if len(tables["errors"]):
-        print(f"\nATENÇÃO: {len(tables['errors'])} linhas com erro (ver {prefix}errors.csv)")
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description="Assignment #1 IAVC — experiências")
-    ap.add_argument("--part1", action="store_true", help="avaliação no HPatches")
-    ap.add_argument("--rotscale", action="store_true", help="teste sintético de rotação e escala")
-    ap.add_argument("--robustness", action="store_true", help="tabela i/v/rot/scale a partir dos CSV")
-    ap.add_argument("--qualitative", action="store_true", help="figuras de keypoints e matches (GRAF, sintético)")
-    ap.add_argument("--graf", action="store_true", help="métricas nos pares GRAF 1->2 e 1->3")
-    ap.add_argument("--fast", action="store_true", help="estudo do FAST (threshold x NMS vs SIFT)")
-    ap.add_argument("--brief", action="store_true", help="estudo do BRIEF próprio (G I, II, III, V vs OpenCV)")
-    ap.add_argument("--curves", action="store_true", help="gráficos F1/F2 a partir dos CSV já calculados")
-    ap.add_argument("--pipelines", nargs="+", default=None,
-                    help="subconjunto de pipelines (omissão: as 6 configurações clássicas)")
-    ap.add_argument("--seqs", nargs="+", default=None, help="subconjunto de sequências (omissão: todas)")
-    ap.add_argument("--max-kps", default=get_config()["max_keypoints"], help="orçamento de keypoints ou 'none'")
-    ap.add_argument("--tag", default="", help="prefixo dos ficheiros de resultados")
-    ap.add_argument("--reuse-raw", action="store_true",
-                    help="--fast: reutiliza <tag>_fast_raw.csv se existir (não repete a corrida)")
-    args = ap.parse_args()
-    if not (args.part1 or args.rotscale or args.robustness or args.qualitative or args.graf or args.fast
-            or args.brief or args.curves):
-        ap.print_help()
-        return
+def run_robustness(cfg, prefix):
+    """Junta as duas corridas anteriores numa tabela método x (i, v, rot, scale)."""
+    tables_dir = cfg["paths"]["tables"]
+    df = pd.concat([pd.read_csv(tables_dir / f"{prefix}raw.csv"),
+                    pd.read_csv(tables_dir / f"{prefix}rotscale_raw.csv")], ignore_index=True)
+    table = robustness_table(summarize(df))
+    table.to_csv(tables_dir / f"{prefix}robustness.csv", float_format="%.4f")
+    print(table.round(3).to_string())
+
+
+def run_graf(cfg, prefix):
+    """Métricas nos dois pares GRAF. São só 2 pares: mostra-se cada um, sem médias (D23)."""
+    df = evaluate_pairs(CLASSIC_METHODS, load_graf_pairs(cfg), cfg)
+    df.to_csv(cfg["paths"]["tables"] / f"{prefix}graf_raw.csv", index=False)
+    df["pair"] = "1->" + df["k"].astype(str)
+    columns = ["N_features", "N_putative", "N_correct", "N_corresp", "PMR", "precision", "matching_score",
+               "recall", "repeatability", "t_det_ms", "t_desc_ms", "t_match_ms"]
+    table = df.set_index(["method", "pair"])[columns]
+    table.to_csv(cfg["paths"]["tables"] / f"{prefix}graf_pairs.csv", float_format="%.4f")
+    print(table.round(3).to_string())
+
+
+def run_fast(cfg, prefix, seqs):
+    """Estudo do FAST: tabela T6, gráficos e legendas."""
+    df = run_fast_study(cfg, seqs)
+    df.to_csv(cfg["paths"]["tables"] / f"{prefix}fast_raw.csv", index=False)
+    table = summarize_fast(df)
+    table.to_csv(cfg["paths"]["tables"] / f"{prefix}fast_T6.csv", float_format="%.4f")
+    print(table.round(3).to_string())
+    folder = cfg["paths"]["figures"] / "fast_study"
+    save_captions(plot_fast(df, cfg, folder), folder / "legendas.md", "estudo do FAST")
+
+
+def run_brief(cfg, prefix, seqs):
+    """BRIEF próprio (4 estratégias) contra o BRIEF do OpenCV, com os mesmos keypoints FAST,
+    nas 4 categorias: tabela T7 e figuras dos padrões de teste."""
+    methods = ["FAST+BRIEF"] + BRIEF_OWN_METHODS
+    df = pd.concat([evaluate_pairs(methods, hpatches_pairs(cfg, seqs), cfg),
+                    evaluate_pairs(methods, make_pairs(cfg), cfg)], ignore_index=True)
+    df.to_csv(cfg["paths"]["tables"] / f"{prefix}brief_raw.csv", index=False)
+    tables = summarize(df)
+    save_tables({name: tables[name] for name in ("T2_matching", "T5_cost", "F1_by_k")},
+                cfg["paths"]["tables"], prefix + "brief_")
+    t7 = robustness_table(tables).reindex(methods)
+    t7.to_csv(cfg["paths"]["tables"] / f"{prefix}brief_T7.csv", float_format="%.4f")
+    print(t7.round(3).to_string())
+    folder = cfg["paths"]["figures"] / "brief_own"
+    save_captions(plot_patterns(cfg, folder), folder / "legendas.md", "BRIEF próprio")
+
+
+def run_curves(cfg, prefix):
+    """Gráficos F1 e F2 dos métodos clássicos e, se existir, do estudo do BRIEF próprio."""
+    tables_dir, figures_dir = cfg["paths"]["tables"], cfg["paths"]["figures"]
+    jobs = {
+        "curves": [f"{prefix}raw.csv", f"{prefix}rotscale_raw.csv"],
+        "curves_brief": [f"{prefix}brief_raw.csv"],
+    }
+    for name, files in jobs.items():
+        if not all((tables_dir / f).exists() for f in files):
+            print(f"{name}: faltam as tabelas {files}; correr primeiro as experiências")
+            continue
+        df = pd.concat([pd.read_csv(tables_dir / f) for f in files], ignore_index=True)
+        folder = figures_dir / name
+        captions = plot_level_curves(df, cfg, folder) + plot_tradeoff(df, cfg, folder)
+        save_captions(captions, folder / "legendas.md", name)
+        print(f"{name}: {len(captions)} figuras em {folder}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Assignment #1 IAVC")
+    for name in ("part1", "rotscale", "robustness", "graf", "qualitative", "fast", "brief", "curves"):
+        parser.add_argument(f"--{name}", action="store_true")
+    parser.add_argument("--tag", default="", help="prefixo dos ficheiros de resultados")
+    parser.add_argument("--seqs", nargs="+", default=None, help="só estas sequências do HPatches")
+    args = parser.parse_args()
+
+    cfg = get_config()
+    set_seeds(cfg)
+    prefix = args.tag + "_" if args.tag else ""
+
     if args.part1:
-        run_part1(args)
+        run_part1(cfg, prefix, args.seqs)
     if args.rotscale:
-        run_rotscale(args)
-    if args.graf:
-        run_graf(args)
-    if args.fast:
-        run_fast(args)
-    if args.brief:
-        run_brief(args)
-    if args.curves:
-        run_curves(args)
+        run_rotscale(cfg, prefix)
     if args.robustness:
-        run_robustness(args)
+        run_robustness(cfg, prefix)
+    if args.graf:
+        run_graf(cfg, prefix)
     if args.qualitative:
-        for path in run_qualitative(get_pipelines(args.pipelines), _cfg_from_args(args)):
-            print("figura:", path)
+        run_qualitative(CLASSIC_METHODS, cfg)
+    if args.fast:
+        run_fast(cfg, prefix, args.seqs)
+    if args.brief:
+        run_brief(cfg, prefix, args.seqs)
+    if args.curves:
+        run_curves(cfg, prefix)
 
 
 if __name__ == "__main__":

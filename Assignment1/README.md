@@ -48,49 +48,48 @@ data/hpatches-sequences-release/
 
 ## Como correr
 
-Implementado:
+Um comando por experiência (Parte 1). Os resultados ficam em `results/tables/` e `results/figures/`.
 
 ```bash
-python src/main.py --part1 --tag classic        # HPatches (i/v)          -> results/tables/classic_*.csv
-python src/main.py --rotscale --tag classic     # sintético rotação/escala -> results/tables/classic_rotscale_*.csv
-python src/main.py --robustness --tag classic   # tabela i/v/rot/scale     -> results/tables/classic_robustness.csv
-python src/main.py --qualitative                # 1 figura por método/objetivo + legendas -> results/figures/qualitative/
-python src/main.py --graf --tag classic         # métricas GRAF 1->2 e 1->3 (por par) -> results/tables/classic_graf_pairs.csv
-python src/main.py --fast --tag classic         # estudo do FAST (threshold x NMS vs SIFT) -> classic_fast_T6.csv + results/figures/fast_study/
-python src/main.py --fast --tag classic --reuse-raw   # refaz só a tabela e as figuras do FAST a partir do CSV
-python src/main.py --brief --tag classic        # BRIEF próprio (G I, II, III, V) vs OpenCV -> classic_brief_T7.csv + results/figures/brief_own/
-python src/main.py --curves --tag classic       # gráficos F1 (curvas por nível) e F2 (exatidão vs tempo) a partir dos CSV -> results/figures/curves*/
-# opções: --pipelines SIFT ORB ...  --seqs i_ajuntament v_graffiti ...  --max-kps 2000|none
+python src/main.py --part1 --tag classic        # HPatches: iluminação e ponto de vista (~15 min)
+python src/main.py --rotscale --tag classic     # teste sintético de rotação e escala
+python src/main.py --robustness --tag classic   # tabela com as 4 categorias (precisa dos dois anteriores)
+python src/main.py --graf --tag classic         # métricas nos pares GRAF 1->2 e 1->3
+python src/main.py --qualitative                # figuras de keypoints e de matches, com legendas
+python src/main.py --fast --tag classic         # estudo do FAST: threshold x NMS contra o SIFT (~7 min)
+python src/main.py --brief --tag classic        # BRIEF próprio (G I, II, III, V) contra o BRIEF do OpenCV
+python src/main.py --curves --tag classic       # gráficos a partir das tabelas já calculadas
 ```
 
-<!-- TODO: por implementar -->
+Opções: `--tag NOME` (prefixo dos ficheiros de resultados) e `--seqs SEQ1 SEQ2 ...` (só algumas
+sequências do HPatches, para testar depressa).
 
-```bash
-python src/main.py --part2     # stitching              -> results/panoramas/
-python src/main.py --all       # tudo
-```
+Testes de sanidade (precisam das imagens GRAF): `python tests/test_sanity.py`
 
-Todos os parâmetros estão em `src/config.py`.
+<!-- TODO (INÊS): --part2 (stitching) -->
+
+Todos os parâmetros estão em `src/config.py`. As decisões e justificações estão em `DECISOES.md`,
+as verificações contra os artigos e o OpenCV em `VERIFICACOES.md`, e as fontes em `FONTES.md`.
 
 ## Estrutura
 
 ```
 src/
-├── config.py          parâmetros únicos
-├── interface.py       contrato comum (Features, MatchResult, Pipeline)
-├── datasets.py        leitura de HPatches / GRAF / panoramas
-├── detectors.py       detetores clássicos
-├── descriptors.py     descritores clássicos
-├── brief_own.py       BRIEF próprio (G I–V)
-├── matching.py        ratio test + cross-check, MNN
-├── learned.py         SuperPoint, LightGlue
-├── homography.py      RANSAC
-├── evaluation.py      métricas e corrida no HPatches
-├── stitching.py       panoramas
-├── methods.py         registo de pipelines
+├── config.py          todos os parâmetros
+├── interface.py       formato comum do resultado de uma imagem (Features)
+├── datasets.py        leitura de HPatches, GRAF e panoramas
+├── detectors.py       SIFT, ORB, KAZE, FAST
+├── descriptors.py     descritores e extração completa (detetar + descrever)
+├── brief_own.py       BRIEF próprio (G I, G II, G III, G V)
+├── matching.py        ratio test + cross-check
+├── methods.py         lista de métodos; extrair e emparelhar
+├── evaluation.py      métricas, corrida sobre os pares, tabelas-resumo
 ├── visualization.py   figuras
-├── studies/           estudos FAST, BRIEF, RANSAC, rotação/escala sintética
-└── main.py            ponto de entrada
-tests/                 testes de sanidade
+├── studies/           rotação/escala sintética, FAST, BRIEF, figuras qualitativas, gráficos
+├── main.py            ponto de entrada
+├── learned.py         SuperPoint, LightGlue          (Pessoa B, por fazer)
+├── homography.py      RANSAC                         (Pessoa B, por fazer)
+└── stitching.py       panoramas                      (Pessoa B, por fazer)
+tests/test_sanity.py   testes de sanidade
 results/               tables/, figures/, panoramas/
 ```

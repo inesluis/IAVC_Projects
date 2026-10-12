@@ -19,7 +19,7 @@ As referências dos artigos estão escritas como no enunciado (secção 10), exc
 | Fonte | Estado | Usada para |
 |---|---|---|
 | Enunciado: "Assignment #1 — Keypoint Detectors, Feature Descriptors and Applications", Artificial Intelligence for (Advanced) Computer Vision, edição 2026/27 (`docs/Assignment_1_Python_Keypoints_Descriptors_Stitching.pdf`) | Lida (completo) | Tudo: métodos a avaliar (§2, §4), protocolo e métricas (§2.7, §2.8), funções a usar (§11), estrutura e reprodutibilidade (§6, §7) |
-| Guia de estudo "Assignment #1 — Guia Completo", versão de 6 de outubro de 2026 (`docs/Guia_Assignment1_IAVC.pdf`) e o seu código de arranque (`docs/starter.py`) | Lida (completo) | Plano e divisão de trabalho; ponto de partida para as definições de repetibilidade e de correspondências ground-truth (depois alteradas, D17); origem do threshold 20 do FAST (D09) |
+| Guia de estudo "Assignment #1 — Guia Completo", versão de 6 de outubro de 2026 (`docs/Guia_Assignment1_IAVC.pdf`) e o seu código de arranque (`docs/starter.py`) | Lida (completo) | Plano e divisão de trabalho; ponto de partida para as definições de repetibilidade e de correspondências ground-truth (depois alteradas, D17); origem do threshold 20 do FAST usado até 12 de outubro (D09) |
 | Notebooks de exemplo dos docentes: `CVC_Sift.ipynb`, `CVC_LightGlue.ipynb`, `CVC_SuperPoint+SuperGlue.ipynb` (`códigos exemplo 2026/`) | **Não abertos** | Não foram a base do código (ver VERIFICACOES.md, 2.5). Só conhecemos o resumo que o guia faz deles |
 
 ## 2. Artigos

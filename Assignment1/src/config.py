@@ -72,7 +72,7 @@ CFG = {
         "SIFT": {"nOctaveLayers": 3, "contrastThreshold": 0.04, "edgeThreshold": 10, "sigma": 1.6},
         "ORB": {"scaleFactor": 1.2, "nlevels": 8, "edgeThreshold": 31, "fastThreshold": 20},
         "KAZE": {"extended": False, "upright": False, "threshold": 0.001},
-        "FAST": {"threshold": 20, "nonmaxSuppression": True, "type": cv2.FAST_FEATURE_DETECTOR_TYPE_9_16},
+        "FAST": {"threshold": 10, "nonmaxSuppression": True, "type": cv2.FAST_FEATURE_DETECTOR_TYPE_9_16},
     },
 
     # ---- Descritores (D11) ----

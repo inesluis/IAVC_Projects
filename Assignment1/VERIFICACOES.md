@@ -107,7 +107,7 @@ tempos), `perspectiveTransform`, `GaussianBlur`, `cvtColor`, `imdecode`/`imencod
 | ORB | WTA_K / patchSize / scoreType | 2 / 31 / Harris | não definidos (omissão) | Igual; com WTA_K = 2 a norma certa é `NORM_HAMMING` |
 | KAZE | extended / upright / threshold | False / False / 0,001 | iguais | Igual |
 | KAZE | nOctaves / nOctaveLayers / diffusivity | 4 / 4 / PM_G2 | não definidos (omissão) | Igual |
-| **FAST** | **threshold** | **10** | **20** | **Diferente** (ver 2.3) |
+| FAST | threshold | 10 | 10 | Igual desde 2026-10-12 (antes era 20; ver 2.3) |
 | FAST | nonmaxSuppression / type | True / TYPE_9_16 | iguais | Igual |
 | BRIEF | bytes / use_orientation | 32 / False | iguais | Igual |
 | BRISK | thresh / octaves / patternScale | 30 / 3 / 1,0 | iguais | Igual |
@@ -116,18 +116,27 @@ tempos), `perspectiveTransform`, `GaussianBlur`, `cvtColor`, `imdecode`/`imencod
 Dimensão dos descritores confirmada na versão instalada: SIFT 128 floats; KAZE 64 floats; ORB 32
 bytes; BRIEF 32 bytes; BRISK 64 bytes; FREAK 64 bytes.
 
-### 2.3 Erro encontrado: o threshold do FAST
+### 2.3 Erro encontrado e corrigido: o threshold do FAST
 
 - A entrada D09 do DECISOES.md dizia que todos os parâmetros dos detetores eram "os valores por
-  omissão do OpenCV". **No FAST isso estava errado:** a omissão é 10 e nós usamos 20.
+  omissão do OpenCV". **No FAST isso estava errado:** a omissão é 10 e usávamos 20.
 - **Origem do 20:** o código de arranque do guia da cadeira (`docs/starter.py`,
   `FastFeatureDetector_create(threshold=20, ...)`). 20 é também o `fastThreshold` por omissão do ORB.
-- **Impacto:** todas as configurações FAST+BRIEF/BRISK/FREAK das experiências principais usam t = 20.
-  Com o limite de 2000 pontos (os de maior resposta), o efeito de usar 10 ou 20 só existe nas imagens
-  em que o FAST com t = 20 encontra menos de 2000 pontos. O estudo do FAST (D24) mostra que t = 20 com
-  NMS dá em média 5,7 mil (`i`) e 9,5 mil (`v`) pontos por imagem.
-- **Decisão pendente:** manter 20 (documentado como escolha) ou passar a 10 e repetir as corridas.
-  A D09 foi corrigida para não afirmar o que não é verdade.
+- **Decisão (2026-10-12): o threshold passou a 10.** Assim todos os detetores usam os parâmetros por
+  omissão e a única alteração é o limite comum de 2000 pontos (no ORB, através de `nfeatures`).
+- **Impacto:** o limite de 2000 fica com os pontos de maior resposta, por isso o resultado só muda
+  onde o FAST com t = 20 não chegava aos 2000 pontos. Na corrida com t = 20 (imagem 1 de cada
+  sequência), 94 de 116 atingiam o limite e 22 ficavam abaixo.
+- **Por fazer:** repetir as corridas; os resultados FAST+X existentes são da versão com t = 20
+  (DECISOES.md, P10). O estudo do FAST (D24) não é afetado.
+
+### 2.3-A O `nfeatures` do ORB (2000 em vez de 500)
+
+- `nfeatures` é o nº máximo de pontos que o ORB guarda; a omissão é 500.
+- Usamos 2000 porque todos os métodos têm o mesmo limite de 2000 pontos por imagem (D05, D10). Com
+  500, o ORB ficaria com um quarto dos pontos dos outros.
+- Na corrida de 2026-10-08, o ORB encontrou sempre mais de 500 pontos na imagem 1 das 116 sequências
+  (mínimo 1027) e chegou ao limite em 102. É uma diferença intencional, não um erro.
 
 ### 2.4 Bibliotecas
 

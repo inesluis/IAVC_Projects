@@ -146,7 +146,9 @@ python src/main.py --brief --tag classic        # BRIEF próprio, ~2 min
 python src/main.py --curves --tag classic       # gráficos a partir dos CSV
 ```
 
-Precisão média por categoria (limite de 2000 pontos, ratio 0,8 + cross-check, correto se erro < 3 px):
+Precisão média por categoria (limite de 2000 pontos, ratio 0,8 + cross-check, correto se erro < 3 px).
+Nota: estes valores são da corrida com o FAST a threshold 20. Em 12 de outubro passámos o FAST para
+10, a omissão do OpenCV; as três linhas FAST+X vão mudar ligeiramente quando as corridas forem repetidas.
 
 | Método | iluminação | ponto de vista | rotação | escala | tempo por par (ms) |
 |---|---|---|---|---|---|

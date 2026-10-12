@@ -36,7 +36,7 @@ Lista das escolhas que **não vêm diretamente do enunciado** ou que **se desvia
 | 18 | **BRIEF próprio: suavização gaussiana 9×9, σ = 2** (ECCV 2010) e não 7×7 ou filtro de caixa (TPAMI 2012) | Segue a versão original e coincide com o kernel 9 do OpenCV | `CFG["brief_own"]["blur_ksize"]`, `["blur_sigma"]` | D25 |
 | 19 | **BRIEF próprio: 4 estratégias (G I, II, III, V); a G IV não foi implementada** | A G IV é a menos especificada no artigo; o enunciado pede pelo menos 2 | Acrescentar "GIV" em `brief_own.make_pairs` e em `STRATEGIES` | D25 |
 | 20 | **BRIEF próprio: coordenadas fora do patch encostadas à borda também na G II** | O artigo só o diz para a G III; com σ = S/5 cerca de 1% das coordenadas cai fora | `brief_own.make_pairs` | D25 |
-| 21 | **FAST com threshold 20 nas experiências principais** (a omissão do OpenCV é 10) | Valor herdado do código de arranque do guia; igual ao `fastThreshold` do ORB. Descoberto na verificação de 2026-10-12 | `CFG["detectors"]["FAST"]["threshold"] = 10` e repetir as corridas | D09, P09 |
+| 21 | **FAST: threshold alterado de 20 para 10 em 2026-10-12** (10 é a omissão do OpenCV) | O 20 vinha do código de arranque do guia e estava documentado, por engano, como valor por omissão. Com 10, todos os detetores usam os parâmetros por omissão | `CFG["detectors"]["FAST"]["threshold"] = 20` e repetir as corridas | D09 |
 
 ---
 
@@ -138,12 +138,12 @@ Lista das escolhas que **não vêm diretamente do enunciado** ou que **se desvia
 
 ### D09 — Parâmetros dos detetores
 - **Estado:** Implementada (`CFG["detectors"]`)
-- **Decisão:** valores por omissão do OpenCV 4.13, escritos explicitamente no config, **exceto o
-  threshold do FAST**:
-  - SIFT: 3 camadas/octava, contrastThreshold 0,04, edgeThreshold 10, σ 1,6 (omissão)
-  - ORB: scaleFactor 1,2, 8 níveis, edgeThreshold 31, fastThreshold 20 (omissão)
-  - KAZE: threshold 0,001, sem `extended` e sem `upright` (omissão)
-  - FAST: NMS ligada e tipo 9/16 (omissão); **threshold 20 (a omissão do OpenCV é 10)**
+- **Decisão:** valores por omissão do OpenCV 4.13 em todos os detetores, escritos explicitamente no
+  config:
+  - SIFT: 3 camadas/octava, contrastThreshold 0,04, edgeThreshold 10, σ 1,6
+  - ORB: scaleFactor 1,2, 8 níveis, edgeThreshold 31, fastThreshold 20
+  - KAZE: threshold 0,001, sem `extended` e sem `upright`
+  - FAST: threshold 10, NMS ligada, tipo 9/16 (threshold alterado de 20 para 10 em 2026-10-12)
 - **Justificação:** os valores por omissão são os recomendados pelos autores/OpenCV. Afiná-los por
   método favoreceria uns métodos em relação a outros. O efeito dos parâmetros do FAST é estudado à
   parte (T6).
@@ -152,9 +152,19 @@ Lista das escolhas que **não vêm diretamente do enunciado** ou que **se desvia
   e a documentação mostram que a omissão é 10. O 20 veio do código de arranque do guia da cadeira
   (`docs/starter.py`) e é igual ao `fastThreshold` por omissão do ORB. Todos os outros parâmetros
   foram confirmados como iguais à omissão (ver VERIFICACOES.md, secção 2.2).
-- **Estado do threshold do FAST:** decisão pendente (P09): manter 20 como escolha documentada ou
-  passar a 10 e repetir as corridas. Com o limite de 2000 pontos (os de maior resposta), a diferença
-  só existe nas imagens em que o FAST com t = 20 encontra menos de 2000 pontos.
+- **Decisão de 2026-10-12 (resolve a P09): o threshold do FAST passa a 10**, a omissão do OpenCV.
+  - **Porquê:** a regra fica simples e sem exceções: "todos os detetores com os parâmetros por
+    omissão; a única alteração é o limite comum de 2000 pontos" (D05, D10). O efeito do threshold
+    continua estudado à parte, com 10, 20, 40 e 80 (D24), e esse estudo não é afetado.
+  - **Impacto esperado:** o limite de 2000 fica com os pontos de maior resposta, por isso só muda
+    onde o FAST com t = 20 não chegava aos 2000. Na corrida de 2026-10-08 (imagem 1 de cada
+    sequência): 94 de 116 atingiam o limite (40 de 57 em `i`; 54 de 59 em `v`); 22 ficavam abaixo
+    (5 delas com menos de 500 pontos; mínimo 128). Nessas, os FAST+BRIEF/BRISK/FREAK passam a ter
+    mais pontos, mais fracos.
+  - **Consequência:** os resultados das configurações FAST+X anteriores a esta data (D22, D23, D25,
+    D26, figuras qualitativas e curvas) foram obtidos com t = 20 e **têm de ser gerados de novo**.
+    SIFT, ORB e KAZE não mudam. O estudo do FAST (D24) também não.
+  - **Como voltar atrás:** `CFG["detectors"]["FAST"]["threshold"] = 20`.
 
 ### D10 — ORB: `nfeatures` = orçamento
 - **Estado:** Implementada
@@ -733,7 +743,10 @@ Pontos e tempo: 285 pares `i`, 295 pares `v`. Repetibilidade: 188 pares `i`, 113
 - **P07 (2026-10-08, atualizado 2026-10-11)** — `main.py`: existem `--part1`, `--rotscale`,
   `--robustness`, `--qualitative`, `--graf`, `--fast`, `--brief` e `--curves`. Falta `--part2`
   (Pessoa B).
-- **P09 (2026-10-12)** — Threshold do FAST nas experiências principais: manter 20 (escolha
-  documentada) ou usar a omissão do OpenCV, 10, e repetir as corridas (~25 min). Ver D09.
+- **P09 (2026-10-12)** — ~~Threshold do FAST: 20 ou 10~~ Resolvido no mesmo dia: passa a 10 (D09).
+- **P10 (2026-10-12)** — **Repetir as corridas** depois da mudança do threshold do FAST e da
+  simplificação do código: `--part1`, `--rotscale`, `--robustness`, `--graf`, `--qualitative`,
+  `--brief`, `--curves`. Até lá, os números das configurações FAST+X em D22, D23, D25 e D26 e as
+  tabelas/figuras em `results/` são da versão com t = 20.
 - **P08 (2026-10-08)** — ~~Análise qualitativa GRAF~~ feita (D21). Falta decidir se as figuras
   (30 JPEG, ≈ 13 MB) vão para o git ou se se geram só para a entrega.

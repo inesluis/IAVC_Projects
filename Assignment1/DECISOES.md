@@ -841,6 +841,32 @@ vista, escala e rotação; nenhuma estratégia aguenta rotações de 30°.
   de ±50%. **Para a corrida oficial (P10):** máquina ligada à corrente e sem outros programas, e
   repetir as experiências sensíveis ao tempo (`--part1`, `--fast`) em separado, com a máquina fria.
 
+### D29 — Estrutura do relatório (2026-10-13)
+- **Estado:** Esqueleto criado (`report/relatorio.tex`, ficheiro único, para o Overleaf com pdfLaTeX).
+  Não foi compilado localmente (não há LaTeX instalado nesta máquina); passou verificações estáticas
+  (chavetas, ambientes, citações, referências, nº de colunas das tabelas, caracteres).
+- **O que o enunciado pede (§8, §9):** introdução (0,75–1 p.); descrição dos detetores, descritores e
+  matchers (3–5 p.: ideia, vantagens, desvantagens, custo; sem reproduzir detalhes de implementação dos
+  artigos); setup e resultados com discussão (2–5 p.); conclusão (0,75–1 p.); referências. Não pede
+  explicação de código. Pede explicitamente a explicação do RANSAC (§3.2) e da composição de
+  homografias (§3.3).
+- **Decisões:** relatório em português; sem preocupação com o limite de páginas sugerido (decisão da
+  Carolina); capa própria com logótipo opcional (`uc_logo.png`).
+- **Estrutura:** 1 Introdução · 2 Métodos (clássicos; BRIEF implementado; aprendidos; emparelhamento,
+  RANSAC e homografia) · 3 Setup (dados; protocolo e métricas; ambiente) · 4 Resultados da Parte 1
+  (deteção e FAST; emparelhamento i/v; rotação e escala; qualitativa; BRIEF; homografia; custo e
+  compromisso) · 5 Resultados da Parte 2 (stitching) · 6 Conclusão · Referências · Anexos (resultados
+  complementares; uso de ferramentas de IA).
+- **Já preenchido:** capa, índice, 7 tabelas com os resultados da D28 (geradas a partir dos CSV por
+  par, para evitar erros de transcrição e de duplo arredondamento), 6 figuras, a secção de setup em
+  rascunho factual e 16 referências. O texto das restantes secções está indicado em caixas "Por
+  escrever", com quem escreve e os pontos a discutir; escondem-se todas com
+  `\renewcommand{\nota}[1]{}`.
+- **Figuras no Overleaf:** carregar a pasta `results/figures` com o nome `figuras`. Uma figura em falta
+  aparece como uma caixa com o nome do ficheiro, sem erro de compilação.
+- **A atualizar depois da corrida oficial:** todas as tabelas e figuras (faltam os métodos aprendidos e
+  a tabela da homografia).
+
 ## Ambiente e repositório
 
 ### D13 — Ambiente Python

@@ -1,15 +1,8 @@
-# Requires Python 3.10 or newer.
-
-# opencv-contrib-python includes the modules provided by opencv-python.
-# Do not install both packages together because they share the cv2 module.
+# Python 3.10 ou superior.
+# NUNCA instalar opencv-python em conjunto: partilha o módulo cv2 com o contrib e estraga-o.
 opencv-contrib-python==4.13.0.92
-# For standard OpenCV only, use this instead of opencv-contrib-python:
-# opencv-python==4.13.0.92
-
 numpy
 scipy
 matplotlib
-scikit-image
 pandas
 psutil
-torch

@@ -18,7 +18,7 @@ CATEGORY_NAMES = {"i": "iluminação (HPatches i_*)", "v": "ponto de vista (HPat
                   "rot": "rotação sintética (GRAF imagem 1)", "scale": "escala sintética (GRAF imagem 1)"}
 X_LABELS = {"i": "Par de imagens", "v": "Par de imagens", "rot": "Ângulo de rotação (°)",
             "scale": "Fator de escala (eixo logarítmico)"}
-MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*"]
+MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*", "h", "<"]
 
 
 def method_styles(methods) -> dict:

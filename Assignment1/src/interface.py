@@ -20,6 +20,7 @@ class Features:
     t_desc: float             # tempo de descrição (ms)
     method: str               # ex.: "SIFT", "FAST+BRIEF"
     n_detected: int = 0       # nº de keypoints antes de o descritor remover os da borda
+    raw: dict | None = None   # só nos métodos aprendidos: tensores do extrator, que o LightGlue recebe
 
 
 def keypoints_to_array(kps) -> np.ndarray:

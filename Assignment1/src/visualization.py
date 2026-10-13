@@ -5,6 +5,7 @@
   plot_curves        gráfico de linhas
   plot_scatter       gráfico de dispersão, um ponto por método
   plot_test_pattern  pares de teste do BRIEF próprio
+  plot_image_grid    várias imagens numa grelha (panoramas)
   save_figure, save_captions
 """
 
@@ -150,6 +151,20 @@ def plot_test_pattern(pairs: np.ndarray, patch_size: int, title: str):
     ax.grid(True, alpha=0.3)
     return fig
 
+
+def plot_image_grid(images, titles, title: str, ncols: int = 1):
+    """Várias imagens numa grelha (por exemplo, panoramas a comparar), cada uma com o seu título."""
+    nrows = -(-len(images) // ncols)
+    h = max(img.shape[0] for img in images)
+    w = max(img.shape[1] for img in images)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(6.5 * ncols, (6.5 * h / w + 0.7) * nrows + 0.5),
+                             layout="constrained", squeeze=False)
+    for ax, img, image_title in zip(axes.ravel(), images, titles):
+        show_image(ax, img, image_title)
+    for ax in axes.ravel()[len(images):]:
+        ax.axis("off")
+    fig.suptitle(title, fontsize=12)
+    return fig
 
 def save_figure(fig, path) -> Path:
     """Grava a figura (PNG ou JPEG, pela extensão), cria a pasta se for preciso, e fecha-a."""

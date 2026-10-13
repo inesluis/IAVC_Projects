@@ -8,10 +8,11 @@
     python src/main.py --fast           # estudo do FAST (~7 min)
     python src/main.py --brief          # BRIEF próprio contra o BRIEF do OpenCV
     python src/main.py --curves         # gráficos a partir das tabelas já calculadas
+    python src/main.py --part2          # stitching: configurações, limiar do RANSAC e imagem de referência
 
-Opções: --tag NOME (prefixo dos ficheiros) e --seqs SEQ1 SEQ2 ... (só algumas sequências, para testar).
-
-# PENDENTE (2026-10-08): --part2 (stitching, Pessoa B).
+Opções: --tag NOME (prefixo dos ficheiros), --seqs SEQ1 SEQ2 ... (só algumas sequências, para testar)
+e --methods M1 M2 ... (só alguns métodos; por omissão correm os clássicos e os aprendidos, e no --part2
+os de cfg["stitching"]["methods"]).
 """
 
 import argparse
@@ -21,27 +22,29 @@ import pandas as pd
 from config import get_config, set_seeds
 from datasets import hpatches_pairs, load_graf_pairs
 from evaluation import evaluate_pairs, robustness_table, save_tables, summarize
-from methods import BRIEF_OWN_METHODS, CLASSIC_METHODS
+from methods import ALL_METHODS, BRIEF_OWN_METHODS
 from studies.brief_study import plot_patterns
 from studies.curves import plot_level_curves, plot_tradeoff
 from studies.fast_study import plot_fast, run_fast_study, summarize_fast
 from studies.qualitative import run_qualitative
+from studies.ransac_study import run_reference_study, run_threshold_study
 from studies.rot_scale_study import make_pairs
+from studies.stitching_study import run_stitching
 from visualization import save_captions
 
 
-def run_part1(cfg, prefix, seqs):
-    """Avalia os métodos clássicos em todos os pares do HPatches."""
-    df = evaluate_pairs(CLASSIC_METHODS, hpatches_pairs(cfg, seqs), cfg)
+def run_part1(cfg, prefix, seqs, methods):
+    """Avalia os métodos em todos os pares do HPatches."""
+    df = evaluate_pairs(methods, hpatches_pairs(cfg, seqs), cfg)
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}raw.csv", index=False)
     tables = summarize(df)
     save_tables(tables, cfg["paths"]["tables"], prefix)
     print(tables["T2_matching"].round(3).to_string())
 
 
-def run_rotscale(cfg, prefix):
-    """Avalia os métodos clássicos no teste sintético de rotação e escala."""
-    df = evaluate_pairs(CLASSIC_METHODS, make_pairs(cfg), cfg)
+def run_rotscale(cfg, prefix, methods):
+    """Avalia os métodos no teste sintético de rotação e escala."""
+    df = evaluate_pairs(methods, make_pairs(cfg), cfg)
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}rotscale_raw.csv", index=False)
     tables = summarize(df)
     save_tables(tables, cfg["paths"]["tables"], prefix + "rotscale_")
@@ -58,9 +61,9 @@ def run_robustness(cfg, prefix):
     print(table.round(3).to_string())
 
 
-def run_graf(cfg, prefix):
+def run_graf(cfg, prefix, methods):
     """Métricas nos dois pares GRAF. São só 2 pares: mostra-se cada um, sem médias (D23)."""
-    df = evaluate_pairs(CLASSIC_METHODS, load_graf_pairs(cfg), cfg)
+    df = evaluate_pairs(methods, load_graf_pairs(cfg), cfg)
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}graf_raw.csv", index=False)
     df["pair"] = "1->" + df["k"].astype(str)
     columns = ["N_features", "N_putative", "N_correct", "N_corresp", "PMR", "precision", "matching_score",
@@ -99,7 +102,7 @@ def run_brief(cfg, prefix, seqs):
 
 
 def run_curves(cfg, prefix):
-    """Gráficos F1 e F2 dos métodos clássicos e, se existir, do estudo do BRIEF próprio."""
+    """Gráficos F1 e F2 dos métodos avaliados e, se existir, do estudo do BRIEF próprio."""
     tables_dir, figures_dir = cfg["paths"]["tables"], cfg["paths"]["figures"]
     jobs = {
         "curves": [f"{prefix}raw.csv", f"{prefix}rotscale_raw.csv"],
@@ -116,34 +119,61 @@ def run_curves(cfg, prefix):
         print(f"{name}: {len(captions)} figuras em {folder}")
 
 
+def run_part2(cfg, prefix, methods):
+    """Parte 2: stitching com várias configurações (tabela T8), estudo do limiar do RANSAC e
+    comparação de imagens de referência. Os panoramas ficam em results/panoramas/."""
+    tables_dir, figures_dir = cfg["paths"]["tables"], cfg["paths"]["figures"]
+    tables_dir.mkdir(parents=True, exist_ok=True)
+
+    table, captions = run_stitching(methods, cfg)
+    table.to_csv(tables_dir / f"{prefix}stitching_T8.csv", index=False, float_format="%.4f")
+    save_captions(captions, figures_dir / "stitching" / "legendas.md", "stitching")
+    print(table.drop(columns=["image1", "image2"]).round(3).to_string(index=False))
+
+    table, captions = run_threshold_study(methods, cfg)
+    table.to_csv(tables_dir / f"{prefix}ransac_threshold.csv", index=False, float_format="%.4f")
+    save_captions(captions, figures_dir / "ransac_study" / "legendas.md", "limiar do RANSAC")
+    print(table[table["method"] == cfg["stitching"]["study_method"]].round(3).to_string(index=False))
+
+    table, captions = run_reference_study(cfg)
+    table.to_csv(tables_dir / f"{prefix}reference.csv", index=False, float_format="%.4f")
+    save_captions(captions, figures_dir / "reference_study" / "legendas.md", "imagem de referência")
+    print(table.round(3).to_string(index=False))
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Assignment #1 IAVC")
-    for name in ("part1", "rotscale", "robustness", "graf", "qualitative", "fast", "brief", "curves"):
+    parser =argparse.ArgumentParser(description="Assignment #1 IAVC")
+    for name in ("part1", "rotscale", "robustness", "graf", "qualitative", "fast", "brief", "curves", "part2"):
         parser.add_argument(f"--{name}", action="store_true")
     parser.add_argument("--tag", default="", help="prefixo dos ficheiros de resultados")
     parser.add_argument("--seqs", nargs="+", default=None, help="só estas sequências do HPatches")
+    parser.add_argument("--methods", nargs="+", default=None, choices=ALL_METHODS, metavar="MÉTODO",
+                        help="só estes métodos (por omissão: todos, clássicos e aprendidos)")
     args = parser.parse_args()
 
     cfg = get_config()
     set_seeds(cfg)
     prefix = args.tag + "_" if args.tag else ""
+    methods = args.methods or ALL_METHODS
 
     if args.part1:
-        run_part1(cfg, prefix, args.seqs)
+        run_part1(cfg, prefix, args.seqs, methods)
     if args.rotscale:
-        run_rotscale(cfg, prefix)
+        run_rotscale(cfg, prefix, methods)
     if args.robustness:
         run_robustness(cfg, prefix)
     if args.graf:
-        run_graf(cfg, prefix)
+        run_graf(cfg, prefix, methods)
     if args.qualitative:
-        run_qualitative(CLASSIC_METHODS, cfg)
+        run_qualitative(methods, cfg)
     if args.fast:
         run_fast(cfg, prefix, args.seqs)
     if args.brief:
         run_brief(cfg, prefix, args.seqs)
     if args.curves:
         run_curves(cfg, prefix)
+    if args.part2:
+        run_part2(cfg, prefix, args.methods or cfg["stitching"]["methods"])
 
 
 if __name__ == "__main__":

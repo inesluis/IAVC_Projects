@@ -80,8 +80,29 @@ CFG = {
     # Figuras qualitativas (D21)
     "qualitative": {"max_matches_drawn": 150},
 
+    # Métodos aprendidos (Pessoa B). O limite de keypoints é o "max_keypoints" acima.
+    "learned": {
+        "device": None,    # None = "cuda" se existir, senão "cpu"
+        "resize": None,    # None = resolução original, como nos métodos clássicos
+        # LightGlue: confiança mínima de um match e paragem antecipada (valores por omissão do pacote)
+        "lightglue": {"filter_threshold": 0.1, "depth_confidence": 0.95, "width_confidence": 0.99},
+    },
+
     # RANSAC (Pessoa B)
     "ransac": {"thr_px": 3.0, "max_iters": 2000, "confidence": 0.995},
+
+    # Stitching (Pessoa B)
+    "stitching": {
+        # conjuntos de imagens: uma pasta cada, imagens .jpg por ordem de nome (esquerda -> direita)
+        "sets": {"keble": ROOT / "data" / "Panorama", "proprio": ROOT / "data" / "panorama2"},
+        "max_side": 1000,   # fotografias com o lado maior acima disto são reduzidas (px)
+        # configurações comparadas: descritor float, binário, e duas aprendidas (enunciado §3: pelo menos 3)
+        "methods": ["SIFT", "ORB", "KAZE", "SuperPoint+NN", "SuperPoint+LightGlue"],
+        # estudo do limiar do RANSAC (§3.2); os panoramas lado a lado são os do "study_method"
+        "ransac_thresholds_px": [0.5, 1.0, 2.0, 3.0, 5.0, 10.0],
+        "study_set": "keble",
+        "study_method": "SIFT",   # também usado na comparação de imagens de referência (§3.3)
+    },
 }
 
 

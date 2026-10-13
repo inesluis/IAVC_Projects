@@ -6,3 +6,8 @@ scipy
 matplotlib
 pandas
 psutil
+torch
+torchvision
+
+# For LightGlue, install the latest version from GitHub:
+git+https://github.com/cvg/LightGlue.git

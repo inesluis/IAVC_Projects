@@ -207,3 +207,62 @@ Três escolhas que afetam a tua parte e convém saberes:
 
 Dúvidas ainda por confirmar com o professor: que imagens usar no stitching (P02), se os métodos
 aprendidos podem usar um subconjunto do HPatches (P03), data de entrega, língua e limite de páginas (P04).
+
+---
+
+## 7. Resposta da Inês (14 de outubro de 2026)
+
+O detalhe está no DECISOES.md (D29–D38) e no VERIFICACOES.md (secção 3).
+
+### 7.1 O que está feito (ramo `Ines`, commit `4615590`)
+
+```bash
+git fetch origin
+git merge origin/Ines
+```
+
+| Pedido | Estado | Onde |
+|---|---|---|
+| 3.1 `estimate_homography` | Feito, com a assinatura e o retorno que pediste. Seed reposta em cada chamada (resultado determinístico) | `src/homography.py`, D32 |
+| 3.2 Métodos aprendidos | Feito: `extract_superpoint`, `extract_sift_lg`, `match_lightglue`; ligados em `methods.py` (`LEARNED_METHODS`, `ALL_METHODS`) | `src/learned.py`, D29–D31 |
+| 3.2 `main.py` com os aprendidos | Feito: `--part1`, `--rotscale`, `--graf` e `--qualitative` correm os 9 métodos por omissão | `src/main.py` |
+| 3.3 `requirements.txt` e README | Feito | |
+| 3.3 Parte 2 | Feito: stitching, estudo do limiar, estudo da referência, `--part2` | D33–D36 |
+
+Testei os aprendidos na tua avaliação (4 sequências + sintético): correm sem erros (D37).
+
+### 7.2 Respostas à secção 4
+
+1. **Resolução:** a original (`resize = None`), como nos clássicos.
+2. **Limite de pontos:** 2000 (`max_num_keypoints`). É um teto: o SuperPoint deteta menos em várias
+   imagens.
+3. **Máquina:** proposta na D38. O meu PC (Ryzen 7 8700F + RTX 5060 Ti, desktop) evita as variações de
+   tempo do portátil (D28), mas o teu também serve. O importante é ser tudo numa só máquina.
+
+### 7.3 O que precisas de saber para as tuas tabelas e o teu texto
+
+- **T4 (P05):** já podes chamar `estimate_homography` em `evaluate_pair`. Devolve `(None, None, nan)`
+  com menos de 4 matches.
+- **Tempos:** nos aprendidos, `t_desc = 0` e `t_det` = tempo total da rede. Os aprendidos correm em GPU
+  e os clássicos em CPU: dizer isto junto da T5.
+- **Protocolo de matching (§2.8):** o LightGlue não usa ratio test. O match putativo é um par com
+  confiança ≥ 0,1 e `DMatch.distance = 1 − confiança`. O SuperPoint+NN usa o teu ratio 0,8 +
+  cross-check (D31).
+- **SIFT+LightGlue** usa o SIFT do pacote (RootSIFT, outros parâmetros), não o `cv2.SIFT` da
+  configuração "SIFT" (D30).
+- **Robustez:** o SuperPoint não é invariante à rotação: no teste sintético cai para ≤ 0,06 de
+  precisão a partir de 60° (D37). Vai aparecer na tabela de robustez e nas curvas.
+- **Ficheiros teus que alterei:** `interface.py` (campo `raw`), `methods.py` e `main.py` (ligação dos
+  aprendidos e `--part2`), `visualization.py` (nova `plot_image_grid`), `curves.py` (mais 2
+  marcadores, para 9 métodos), `config.py` (secções `learned`, `ransac` e `stitching`).
+- **Numeração no DECISOES.md:** usei D29–D38 e P11–P13. As tuas próximas entradas começam em D39 e
+  P14.
+
+### 7.4 O que falta
+
+| O quê | Quem |
+|---|---|
+| T4 em `evaluation.py` (P05) | Carolina |
+| Combinar a máquina e fazer a corrida oficial (D38) | As duas |
+| Força bruta vs FLANN no stitching (P12) | Inês |
+| Relatório: métodos aprendidos, RANSAC, resultados da Parte 2 | Inês |

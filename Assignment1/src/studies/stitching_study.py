@@ -1,4 +1,4 @@
-"""Stitching com várias configurações: tabela T8, figuras e panoramas (enunciado §3.1).  [Pessoa B]
+"""Stitching com várias configurações: tabela T8, figuras e panoramas
 
 Para cada conjunto de imagens e cada método:
   results/figures/stitching/<conjunto>/keypoints/<método>.jpg      keypoints na imagem de referência
@@ -37,7 +37,7 @@ def run_stitching(methods, cfg: dict):
     """Corre o pipeline completo em todos os conjuntos. Devolve (tabela, legendas).
 
     A tabela tem uma linha por (conjunto, método, par de imagens adjacentes) com o nº de matches,
-    o nº e o rácio de inliers e o erro médio de reprojeção dos inliers (passo 7 do enunciado).
+    o nº e o rácio de inliers e o erro médio de reprojeção dos inliers
     """
     figures = Path(cfg["paths"]["figures"]) / "stitching"
     max_lines = cfg["qualitative"]["max_matches_drawn"]

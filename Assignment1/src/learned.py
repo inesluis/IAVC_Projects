@@ -1,4 +1,4 @@
-"""Métodos aprendidos: SuperPoint, SIFT do LightGlue e o matcher LightGlue.  [Pessoa B]
+"""Métodos aprendidos: SuperPoint, SIFT do LightGlue e o matcher LightGlue.
 
 Implementação e pesos pré-treinados: pacote cvg/LightGlue (Lindenberger, Sarlin e Pollefeys, ICCV 2023).
 Os pesos são descarregados pelo pacote na primeira utilização.
@@ -34,7 +34,7 @@ EXTRACTORS = {"superpoint": SuperPoint, "sift": SIFT}
 # Features.method de cada extrator; o LightGlue usa-o para escolher os pesos
 METHOD_NAMES = {"superpoint": "SuperPoint", "sift": "SIFT-LG"}
 
-_models = {}   # modelos já carregados, para não os carregar em cada imagem
+_models = {} # modelos já carregados, para não os carregar em cada imagem
 
 
 def get_device(cfg: dict) -> str:

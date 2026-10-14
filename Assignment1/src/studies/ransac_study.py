@@ -1,12 +1,12 @@
-"""Estudo do limiar do RANSAC e da escolha da imagem de referência.  [Pessoa B]
+"""Estudo do limiar do RANSAC e da escolha da imagem de referência.
 
-Limiar (enunciado §3.2): com os mesmos matches, varia-se só o limiar e regista-se o nº de inliers,
+Limiar: com os mesmos matches, varia-se só o limiar e regista-se o nº de inliers,
 o erro de reprojeção e o efeito no panorama.
   results/figures/ransac_study/inlier_ratio.png     rácio de inliers em função do limiar, por método
   results/figures/ransac_study/panoramas.jpg        panoramas lado a lado, um por limiar
   results/panoramas/ransac/<conjunto>_thr<limiar>.jpg
 
-Referência (enunciado §3.3): com as mesmas homografias adjacentes, muda-se só a imagem de referência.
+Referência: com as mesmas homografias adjacentes, muda-se só a imagem de referência.
   results/figures/reference_study/<conjunto>.jpg    panoramas lado a lado, um por referência
   results/panoramas/reference/<conjunto>_ref<i>.jpg
 """
@@ -36,9 +36,6 @@ def stitch_or_none(images, pairs, ref: int):
     except ValueError:
         return None
 
-
-# ---------------------------------------------------------------- limiar do RANSAC
-
 def run_threshold_study(methods, cfg: dict):
     """Varia o limiar do RANSAC num conjunto de imagens fixo. Devolve (tabela, legendas).
 
@@ -55,7 +52,7 @@ def run_threshold_study(methods, cfg: dict):
     rows, panoramas = [], {}
     for method in methods:
         features = [extract_features(method, gray, cfg) for gray in grays]
-        matches = match_adjacent(method, features, cfg)   # os mesmos matches para todos os limiares
+        matches = match_adjacent(method, features, cfg) # os mesmos matches para todos os limiares
         baseline = estimate_adjacent(features, matches, cfg)
 
         for thr in thresholds:
@@ -112,9 +109,6 @@ def run_threshold_study(methods, cfg: dict):
                                f"central ({names[ref]}); média dos píxeis na sobreposição. No título, o nº de "
                                f"inliers de cada par adjacente. Eixos em píxeis."))
     return df, captions
-
-
-# ---------------------------------------------------------------- imagem de referência
 
 def polygon_area(points: np.ndarray) -> float:
     """Área de um polígono dado pelos vértices (N, 2), pela fórmula do atacador."""

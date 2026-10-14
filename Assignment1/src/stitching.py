@@ -1,5 +1,5 @@
 """
-stitching.py — Construção de panoramas (warp + canvas + média)  [Pessoa B]
+stitching.py — Construção de panoramas (warp + canvas + média)
 
 Passos 9 a 12 do enunciado (§3.1):
      9. Deformar (warp) cada imagem para o referencial da imagem de referência.
@@ -142,7 +142,7 @@ def stitch_pair(img_ref, img_mov, H_mov_to_ref):
 
 
 # ---------------------------------------------------------------------------
-# DAS IMAGENS ÀS HOMOGRAFIAS (passos 1 a 7 do enunciado)
+# DAS IMAGENS ÀS HOMOGRAFIAS
 # ---------------------------------------------------------------------------
 def load_panorama_images(folder, cfg: dict):
     """
@@ -173,8 +173,7 @@ def match_adjacent(method: str, features, cfg: dict) -> list:
 
 def estimate_adjacent(features, matches, cfg: dict) -> list:
     """
-    Homografia RANSAC de cada par de imagens adjacentes, com o que o enunciado
-    pede para reportar (passo 7). Devolve um dicionário por par:
+    Homografia RANSAC de cada par de imagens adjacentes. Devolve um dicionário por par:
         H (leva a imagem i para a i+1, ou None se falhou), inliers (máscara),
         N_matches, N_inliers, inlier_ratio, reproj_err_px
     """
@@ -208,7 +207,7 @@ if __name__ == "__main__":
     if args.thr is not None:
         cfg["ransac"]["thr_px"] = args.thr
 
-    loaded = [load_image(p) for p in args.images]   # (cores, cinzento); o cinzento é só para detetar
+    loaded = [load_image(p) for p in args.images] # (cores, cinzento); o cinzento é só para detetar
     images = [bgr for bgr, _ in loaded]
     features = [extract_features(args.method, gray, cfg) for _, gray in loaded]
     ref = len(images) // 2 if args.ref is None else args.ref

@@ -1,4 +1,4 @@
-"""Estimação robusta de homografias (RANSAC), erro de reprojeção e composição.  [Pessoa B]
+"""Estimação robusta de homografias (RANSAC), erro de reprojeção e composição.
 
 Uma homografia H é uma matriz 3x3 que leva pontos de uma imagem para outra:
     [x', y', w']^T = H · [x, y, 1]^T    ->    ponto final = (x'/w', y'/w')
@@ -24,7 +24,7 @@ def reprojection_errors(p1, p2, H: np.ndarray) -> np.ndarray:
 
 
 def estimate_homography(kps1, kps2, matches, cfg: dict):
-    """Estima com RANSAC a homografia que leva a imagem 1 para a imagem 2 (enunciado §3.1, passos 6 e 7).
+    """Estima com RANSAC a homografia que leva a imagem 1 para a imagem 2
 
     RANSAC (dentro do cv2.findHomography):
       1. escolhe 4 matches ao acaso e calcula uma H candidata;
@@ -55,7 +55,7 @@ def estimate_homography(kps1, kps2, matches, cfg: dict):
 
 
 def chain_to_reference(adjacent: list, ref_index: int) -> list:
-    """Compõe homografias entre imagens adjacentes para as levar todas à mesma referência (enunciado §3.3).
+    """Compõe homografias entre imagens adjacentes para as levar todas à mesma referência
 
     adjacent[i] leva a imagem i para a imagem i+1 (N imagens, N-1 matrizes). Devolve N matrizes:
     a posição i leva a imagem i para a imagem ref_index.
@@ -71,8 +71,8 @@ def chain_to_reference(adjacent: list, ref_index: int) -> list:
     to_ref = [None] * n_images
     to_ref[ref_index] = np.eye(3)
 
-    for i in range(ref_index - 1, -1, -1):        # à esquerda da referência: i -> i+1 -> ... -> ref
+    for i in range(ref_index - 1, -1, -1): # à esquerda da referência: i -> i+1 -> ... -> ref
         to_ref[i] = to_ref[i + 1] @ adjacent[i]
-    for i in range(ref_index + 1, n_images):      # à direita: i -> i-1 -> ... -> ref (inversas)
+    for i in range(ref_index + 1, n_images): # à direita: i -> i-1 -> ... -> ref (inversas)
         to_ref[i] = to_ref[i - 1] @ np.linalg.inv(adjacent[i - 1])
     return to_ref

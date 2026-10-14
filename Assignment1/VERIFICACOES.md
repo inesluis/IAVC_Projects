@@ -5,6 +5,11 @@ Verificações feitas em 12 de outubro de 2026 sobre o código do ramo `carolina
 1. o BRIEF próprio comparado, afirmação a afirmação, com os dois artigos do BRIEF;
 2. as funções e os parâmetros do OpenCV comparados com a versão instalada e com o enunciado.
 
+Verificações feitas em 14 de outubro de 2026 sobre o código do ramo `Ines` (commit `4615590`):
+
+3. a parte da Pessoa B (homografia, stitching, métodos aprendidos) em casos com resposta conhecida, e
+   os parâmetros dos métodos aprendidos comparados com o pacote instalado.
+
 Legenda: **Igual** (o código faz o que a fonte diz) · **Interpretação** (a fonte é ambígua e
 escolhemos uma leitura) · **Escolha nossa** (a fonte não diz nada) · **Diferente** (fazemos outra
 coisa, com motivo).
@@ -88,8 +93,10 @@ valores por omissão foram lidos dos próprios objetos (`getThreshold()`, etc.),
 | `cv2.xfeatures2d.BriefDescriptorExtractor_create()`, `cv2.BRISK_create()`, `cv2.xfeatures2d.FREAK_create()` | `descriptors.py` | §2.5: BRIEF e FREAK podem exigir o `opencv-contrib-python` | Igual |
 | Normas: `NORM_L2` (SIFT, KAZE), `NORM_HAMMING` (ORB, BRIEF, BRISK, FREAK) | `descriptors.py` | "For binary descriptors, use Hamming distance; for SIFT-like floating-point descriptors, use an L2-compatible metric" | Igual; coincide com `defaultNorm()` de cada objeto e com a recomendação da documentação do `BFMatcher` |
 | Figuras de matches em Matplotlib | `visualization.py` | "Use cv2.drawMatches() or custom Matplotlib visualizations" | Igual (segunda opção) |
-| `cv2.findHomography`, `cv2.warpPerspective` | — | Indicadas para a homografia e o warping | Parte da Pessoa B (por fazer) |
-| `cv2.Stitcher` | — | "Students should avoid relying on cv2.Stitcher" | Não usado |
+| `cv2.findHomography(..., cv2.RANSAC, ...)` | `homography.py` | "Use cv2.findHomography() with RANSAC for robust homography estimation" | Igual (secção 3.1) |
+| `cv2.warpPerspective` | `stitching.py` | "Use cv2.warpPerspective() for projective image warping" | Igual (secção 3.2) |
+| `cv2.Stitcher` | — | "Students should avoid relying on cv2.Stitcher" | Não usado; canvas e composição feitos por nós (§3.4) |
+| SuperPoint e LightGlue pré-treinados (PyTorch) | `learned.py` | "use a documented pretrained PyTorch implementation and record the model/checkpoint used" | Igual: cvg/LightGlue, pesos na secção 3.3 e na D29 |
 
 Outras funções do OpenCV usadas: `detect` e `compute` (em chamadas separadas, para medir os dois
 tempos), `perspectiveTransform`, `GaussianBlur`, `cvtColor`, `imdecode`/`imencode`,
@@ -148,9 +155,10 @@ bytes; BRIEF 32 bytes; BRISK 64 bytes; FREAK 64 bytes.
 | pandas | Sim ("for storing experimental results") | Sim | Tabelas e CSV |
 | scikit-image | Sim ("where useful") | Não | Não foi necessária |
 | psutil | Sim ("optional memory measurements") | Não | A memória dos descritores é calculada diretamente (`desc.nbytes`). Está no `requirements.txt` sem ser usada |
-| PyTorch | Sim (métodos aprendidos) | Ainda não | Parte da Pessoa B |
+| PyTorch | Sim (métodos aprendidos) | Sim | SuperPoint e LightGlue (`learned.py`) |
+| LightGlue (cvg/LightGlue, GitHub) | Sim (§2.6 dá o repositório) | Sim | SuperPoint, SIFT do pacote e matcher LightGlue; instala o kornia como dependência |
 
-Nenhuma biblioteca fora da lista do enunciado é usada.
+Fora da lista do enunciado só o pacote LightGlue, cujo repositório o próprio enunciado indica (§2.6).
 
 ### 2.5 Códigos de exemplo dos professores
 
@@ -159,3 +167,43 @@ partir do enunciado, que é a fonte que define o protocolo (3 px, ratio 0,8, emp
 métricas obrigatórias). Segundo o guia da cadeira, os notebooks usam escolhas diferentes das do
 enunciado nalguns pontos (por exemplo, 5 px e só cross-check no notebook do SIFT). No relatório não se
 deve afirmar que partimos desses códigos.
+
+---
+
+## 3. Parte da Pessoa B: verificações em casos com resposta conhecida
+
+Feitas em 2026-10-14 no PC da Inês (ambiente na D13), com scripts à parte (não estão em
+`tests/test_sanity.py`, P13). Os pares sintéticos são os do teste de rotação e escala (D20), cuja
+homografia é exata. "Corner error" = distância média entre os 4 cantos da imagem projetados com a H
+estimada e com a H exata.
+
+### 3.1 Homografia (`homography.py`)
+
+| # | Verificação | Resultado | Estado |
+|---|---|---|---|
+| 1 | `estimate_homography` recupera a H exata (escala 0,9×) | corner error: SIFT 0,09 px; SIFT+LightGlue 0,03; SuperPoint+LightGlue 0,39; SuperPoint+NN 0,49; ORB 0,52 | Igual |
+| 2 | Idem com rotação de 30° e escala 1,5× | corner error ≤ 1,36 px em todos os métodos (o maior: SuperPoint+LightGlue a 30°) | Igual |
+| 3 | O erro devolvido é a média de ‖H·p1 − p2‖ só nos inliers | cálculo à mão em coordenadas homogéneas: 0,233152 = 0,233152 px | Igual |
+| 4 | Determinismo: a mesma entrada dá a mesma H, mesmo depois de mudar a seed global | H e máscara idênticas (a função repõe a seed em cada chamada) | Igual |
+| 5 | Menos de 4 matches | `(None, None, nan)` | Igual |
+| 6 | `chain_to_reference` com 4 homografias conhecidas | ref. 1: imagem 1 = I, imagem 0 = H₀₁, imagem 2 = H₁₂⁻¹; ref. 0: imagem 3 = H₀₁⁻¹·H₁₂⁻¹·H₂₃⁻¹; ref. 3: imagem 0 = H₂₃·H₁₂·H₀₁ | Igual |
+
+### 3.2 Canvas, warp e composição (`stitching.py`)
+
+| # | Verificação | Resultado | Estado |
+|---|---|---|---|
+| 7 | Canvas para uma imagem 200×100 e a sua cópia deslocada (+150, −30) px | 350×130 px e translação (0, 30), como esperado | Igual |
+| 8 | Píxeis pretos da própria imagem não contam como vazios | máscara 1 num píxel preto da imagem; 0 fora das imagens | Igual |
+| 9 | Fora da sobreposição a cor fica igual; na sobreposição faz-se a média | 200 → 200; média de 200 e 0 → 100; média de 100 e 50 → 75 | Igual |
+
+### 3.3 Métodos aprendidos (`learned.py`)
+
+| # | Verificação | Resultado | Estado |
+|---|---|---|---|
+| 10 | Parâmetros usados = `default_conf` do pacote instalado, exceto o limite de pontos | SuperPoint, SIFT do pacote e LightGlue: valores na D30 | Igual (limite 2000 por escolha nossa, D05) |
+| 11 | Pesos usados | `superpoint_v1.pth`, `superpoint_lightglue_v0-1_arxiv.pth`, `sift_lightglue_v0-1_arxiv.pth` na cache do torch | Igual ao README |
+| 12 | Descritores do SuperPoint | `float32 (N, 256)`, norma L2 = 1 em todos | Igual ao esperado para `NORM_L2` |
+| 13 | Keypoints em coordenadas da imagem original com `resize` ligado | `resize = 200` na GRAF (400×320): máx. x = 382 e máx. y = 302 | Igual |
+| 14 | Localização sub-píxel | SuperPoint: 100% das coordenadas inteiras (GRAF e `keble`); SIFT do pacote 0,3%; SIFT 1%; KAZE 0,6%; ORB 26% (só os do nível 0 da pirâmide) | O SuperPoint do pacote não refina ao sub-píxel: o código converte para float os índices dos píxeis (`superpoint.py`, linha 210). Explica o erro de reprojeção ~1 px (D34) |
+| 15 | Matches do LightGlue 1-para-1 | índices sem repetição nas duas imagens; `distance` em [0,001; 0,894], ou seja confiança ≥ 0,1 | Igual (D31) |
+| 16 | Métodos aprendidos na avaliação da Parte 1 | 4 sequências HPatches + teste sintético, 0 erros (D37) | Igual |

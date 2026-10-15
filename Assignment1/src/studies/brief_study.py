@@ -1,12 +1,7 @@
-"""Estudo do BRIEF próprio: figuras dos padrões de teste de cada estratégia (D25).  [Pessoa A]
-
-A comparação numérica com o BRIEF do OpenCV (tabela T7) usa a avaliação normal, em main.py --brief.
-"""
-
+# Estudo do BRIEF próprio: figuras dos padrões de teste de cada estratégia 
+ 
 from pathlib import Path
-
 import numpy as np
-
 from brief_own import STRATEGIES, make_pairs
 from visualization import plot_test_pattern, save_figure
 
@@ -18,10 +13,8 @@ DESCRIPTIONS = {
     "GV": "X fixo no centro e Y em todos os pontos de uma grelha polar",
 }
 
-
 def plot_patterns(cfg: dict, folder: Path) -> list:
-    """Uma figura por estratégia com os pares de teste, como a Fig. 2 do artigo.
-    Devolve [(ficheiro, legenda)]."""
+    # Uma figura por estratégia com os pares de teste, como a Fig. 2 do artigo 
     S, n_bits = cfg["brief_own"]["patch_size"], cfg["brief_own"]["n_bits"]
     captions = []
     for strategy in STRATEGIES:

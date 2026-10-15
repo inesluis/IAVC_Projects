@@ -1,34 +1,19 @@
-"""Figuras para o relatório, feitas com o Matplotlib.  [A + B]
-
-  plot_keypoints     keypoints sobre uma imagem
-  plot_matches       duas imagens lado a lado com os matches (verde/vermelho)
-  plot_curves        gráfico de linhas
-  plot_scatter       gráfico de dispersão, um ponto por método
-  plot_test_pattern  pares de teste do BRIEF próprio
-  save_figure, save_captions
-"""
-
-from pathlib import Path
-
+from pathlib import Path 
 import cv2
 import matplotlib
-import numpy as np
-
-matplotlib.use("Agg")   # só grava ficheiros, não abre janelas
+import numpy as np 
+matplotlib.use("Agg")    
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 from matplotlib.patches import ConnectionPatch  # noqa: E402
-from matplotlib.ticker import NullLocator  # noqa: E402
-
+from matplotlib.ticker import NullLocator  # noqa: E402 
 from interface import keypoints_to_array  # noqa: E402
 
 GREEN = "#00b400"
 RED = "#ff2020"
 YELLOW = "#ffd400"
-
-
-def show_image(ax, img, title: str) -> None:
-    """Mostra uma imagem (cinzento ou BGR) com os eixos em píxeis."""
+ 
+def show_image(ax, img, title: str) -> None: 
     if img.ndim == 2:
         ax.imshow(img, cmap="gray", vmin=0, vmax=255)
     else:
@@ -37,11 +22,8 @@ def show_image(ax, img, title: str) -> None:
     ax.set_xlabel("x (px)")
     ax.set_ylabel("y (px)")
     ax.tick_params(labelsize=8)
-
-
-def plot_keypoints(img, kps, title: str, image_label: str):
-    """Todos os keypoints sobre a imagem, com o mesmo marcador para todos os métodos.
-    O marcador não mostra a escala nem a orientação: compara-se o número e a distribuição (D21)."""
+ 
+def plot_keypoints(img, kps, title: str, image_label: str): 
     h, w = img.shape[:2]
     fig, ax = plt.subplots(figsize=(7, 7 * h / w + 0.5), layout="constrained")
     show_image(ax, img, image_label)
@@ -49,16 +31,9 @@ def plot_keypoints(img, kps, title: str, image_label: str):
     ax.scatter(points[:, 0], points[:, 1], s=14, facecolors="none", edgecolors=YELLOW, linewidths=0.8)
     fig.suptitle(title, fontsize=12)
     return fig
-
-
+ 
 def plot_matches(img1, img2, kps1, kps2, matches, good, label1: str, label2: str, title: str,
-                 good_label: str = "correto", bad_label: str = "errado", max_lines: int = 150, seed: int = 0):
-    """Duas imagens lado a lado, com uma linha por match: verde se good[i], vermelho se não.
-
-    `good` é uma máscara booleana: matches corretos (pela H ground-truth) ou inliers do RANSAC.
-    Com muitos matches desenha-se uma amostra aleatória de max_lines, que mantém a proporção.
-    Devolve (figura, nº de linhas desenhadas).
-    """
+                 good_label: str = "correto", bad_label: str = "errado", max_lines: int = 150, seed: int = 0): 
     h = max(img1.shape[0], img2.shape[0])
     w = img1.shape[1] + img2.shape[1]
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 13 * h / w + 0.9), layout="constrained")
@@ -87,13 +62,9 @@ def plot_matches(img1, img2, kps1, kps2, matches, good, label1: str, label2: str
     fig.legend(handles=handles, loc="outside lower center", ncol=len(handles), fontsize=10, frameon=False)
     fig.suptitle(title, fontsize=12)
     return fig, len(shown)
-
-
+ 
 def plot_curves(series, xlabel: str, ylabel: str, title: str, hlines=(), logx: bool = False,
-                logy: bool = False, xticks=None, xticklabels=None, ylim=None):
-    """Gráfico de linhas.
-    series: lista de dicionários com "x", "y", "label" e, opcionalmente, "style" e "color".
-    hlines: linhas horizontais de referência, dicionários com "y" e "label"."""
+                logy: bool = False, xticks=None, xticklabels=None, ylim=None): 
     fig, ax = plt.subplots(figsize=(7, 4.6), layout="constrained")
     for s in series:
         ax.plot(s["x"], s["y"], s.get("style", "-o"), label=s["label"], color=s.get("color"),
@@ -116,11 +87,8 @@ def plot_curves(series, xlabel: str, ylabel: str, title: str, hlines=(), logx: b
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=8)
     return fig
-
-
-def plot_scatter(points, xlabel: str, ylabel: str, title: str, logx: bool = False):
-    """Gráfico de dispersão com um ponto por método.
-    points: lista de dicionários com "x", "y", "label", "color" e "marker"."""
+ 
+def plot_scatter(points, xlabel: str, ylabel: str, title: str, logx: bool = False): 
     fig, ax = plt.subplots(figsize=(7, 4.6), layout="constrained")
     for p in points:
         ax.scatter(p["x"], p["y"], s=80, color=p["color"], marker=p["marker"], label=p["label"], zorder=3)
@@ -132,10 +100,8 @@ def plot_scatter(points, xlabel: str, ylabel: str, title: str, logx: bool = Fals
     ax.set_title(title, fontsize=11)
     ax.grid(True, which="both", alpha=0.3)
     return fig
-
-
-def plot_test_pattern(pairs: np.ndarray, patch_size: int, title: str):
-    """Pares de teste de um descritor binário: um segmento por par, em coordenadas do patch."""
+ 
+def plot_test_pattern(pairs: np.ndarray, patch_size: int, title: str): 
     half = patch_size / 2
     fig, ax = plt.subplots(figsize=(5, 5.3), layout="constrained")
     for x1, y1, x2, y2 in pairs:
@@ -149,10 +115,22 @@ def plot_test_pattern(pairs: np.ndarray, patch_size: int, title: str):
     ax.set_title(title, fontsize=11)
     ax.grid(True, alpha=0.3)
     return fig
+ 
+def plot_image_grid(images, titles, title: str, ncols: int = 1):
+    # Várias imagens numa grelha (por exemplo, panoramas a comparar), cada uma com o seu título
+    nrows = -(-len(images) // ncols)
+    h = max(img.shape[0] for img in images)
+    w = max(img.shape[1] for img in images)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(6.5 * ncols, (6.5 * h / w + 0.7) * nrows + 0.5),
+                             layout="constrained", squeeze=False)
+    for ax, img, image_title in zip(axes.ravel(), images, titles):
+        show_image(ax, img, image_title)
+    for ax in axes.ravel()[len(images):]:
+        ax.axis("off")
+    fig.suptitle(title, fontsize=12)
+    return fig
 
-
-def save_figure(fig, path) -> Path:
-    """Grava a figura (PNG ou JPEG, pela extensão), cria a pasta se for preciso, e fecha-a."""
+def save_figure(fig, path) -> Path: 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.suffix == ".jpg":
@@ -161,10 +139,8 @@ def save_figure(fig, path) -> Path:
         fig.savefig(path, dpi=150)
     plt.close(fig)
     return path
-
-
-def save_captions(captions, path, title: str) -> None:
-    """Grava as legendas das figuras num ficheiro Markdown. captions: [(ficheiro, texto), ...]."""
+ 
+def save_captions(captions, path, title: str) -> None: 
     path = Path(path)
     lines = [f"# Legendas — {title}", "", "Geradas automaticamente com os números da corrida.", ""]
     for figure_path, text in captions:

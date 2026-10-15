@@ -1,30 +1,17 @@
-"""Figuras qualitativas: uma figura por método e por objetivo, com legendas prontas (D19, D21).  [Pessoa A]
-
-results/figures/qualitative/
-  keypoints/<método>.jpg    keypoints na imagem 1 do GRAF
-  graf_1to2/<método>.jpg    matches certos (verde) e errados (vermelho), GRAF imagem 1 -> imagem 2
-  graf_1to3/<método>.jpg    o mesmo, GRAF imagem 1 -> imagem 3 (ponto de vista mais afastado)
-  rot45/<método>.jpg        o mesmo, par sintético com rotação de 45 graus
-  scale2/<método>.jpg       o mesmo, par sintético com escala 2x
-  legendas.md
-"""
+# Figuras qualitativas: uma figura por método e por objetivo 
 
 from pathlib import Path
-
 from datasets import load_graf_pairs
 from evaluation import match_errors
 from methods import extract_features, match_features
 from studies.rot_scale_study import make_pairs
 from visualization import plot_keypoints, plot_matches, save_captions, save_figure
 
-
-def file_name(method: str) -> str:
-    """Nome de ficheiro para um método: "FAST+BRIEF" -> "FAST-BRIEF.jpg"."""
+def file_name(method: str) -> str: 
     return method.replace("+", "-") + ".jpg"
 
-
 def keypoint_figures(methods, pair, cfg: dict, folder: Path) -> list:
-    """Uma figura por método com os keypoints da imagem 1 do par. Devolve [(ficheiro, legenda)]."""
+    # Uma figura por método com os keypoints da imagem 1 do par 
     h, w = pair.gray1.shape
     limit = f"limite de {cfg['max_keypoints']} pontos com maior resposta"
     captions = []
@@ -46,7 +33,7 @@ def keypoint_figures(methods, pair, cfg: dict, folder: Path) -> list:
 
 def match_figures(methods, pair, img1, imgk, label1: str, labelk: str, pair_name: str, cfg: dict,
                   folder: Path) -> list:
-    """Uma figura por método com os matches do par, verdes se corretos. Devolve [(ficheiro, legenda)]."""
+    # Uma figura por método com os matches do par, verdes se corretos 
     eps = cfg["eval"]["eps_px"]
     max_lines = cfg["qualitative"]["max_matches_drawn"]
     captions = []
@@ -77,7 +64,7 @@ def match_figures(methods, pair, img1, imgk, label1: str, labelk: str, pair_name
 
 
 def run_qualitative(methods, cfg: dict) -> None:
-    """Gera todas as figuras qualitativas e o ficheiro de legendas."""
+    # Gera todas as figuras qualitativas e o ficheiro de legendas 
     folder = Path(cfg["paths"]["figures"]) / "qualitative"
     graf = load_graf_pairs(cfg)
 

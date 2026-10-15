@@ -1,11 +1,3 @@
-"""Estimação robusta de homografias (RANSAC), erro de reprojeção e composição 
-
-Uma homografia H é uma matriz 3x3 que leva pontos de uma imagem para outra:
-    [x', y', w']^T = H · [x, y, 1]^T    ->    ponto final = (x'/w', y'/w')
-
-Convenção: a H devolvida leva pontos da imagem 1 para a imagem 2 (como a ground-truth do HPatches) 
-"""
-
 import cv2
 import numpy as np
 
@@ -17,9 +9,22 @@ def project_points(points, H: np.ndarray) -> np.ndarray:
     return cv2.perspectiveTransform(points, H).reshape(-1, 2)
  
 def reprojection_errors(p1, p2, H: np.ndarray) -> np.ndarray:
-    # Erro de reprojeção de cada par em píxeis: distância entre H · p1 e p2 
+    # Erro de reprojeção de cada par em píxeis: distância entre H · p1 e p2
     return np.linalg.norm(project_points(p1, H) - p2, axis=1)
-  
+
+def image_corners(image: np.ndarray) -> np.ndarray:
+    # Os 4 cantos de uma imagem, como array (4, 2) de pontos (x, y)
+    h, w = image.shape[:2]
+    return np.float64([[0, 0], [w, 0], [w, h], [0, h]])
+
+def corner_distance(H_a, H_b, image: np.ndarray) -> float:
+    # Distância média (px) entre os 4 cantos da imagem projetados com H_a e com H_b.
+    # 0 = mesma geometria. nan se alguma das homografias não existe.
+    if H_a is None or H_b is None:
+        return np.nan
+    corners = image_corners(image)
+    return float(np.linalg.norm(project_points(corners, H_a) - project_points(corners, H_b), axis=1).mean())
+
 def estimate_homography(kps1, kps2, matches, cfg: dict):
     # Estima com RANSAC a homografia que leva a imagem 1 para a imagem 2
 

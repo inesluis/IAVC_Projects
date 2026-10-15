@@ -4,7 +4,9 @@
 Protocolo:
   - um match é correto se || H · p1 - p2 || < 3 px, com H a homografia ground-truth;
   - PMR = N_putative / N_features          Precision = N_correct / N_putative
-    Matching score = N_correct / N_features    Recall = N_correct / N_corresp 
+    Matching score = N_correct / N_features    Recall = N_correct / N_corresp
+  - homografia: RANSAC sobre os matches putativos; corner error = distância média entre os 4 cantos
+    da imagem 1 projetados com a H estimada e com a H ground-truth
 """
 
 import time
@@ -15,6 +17,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import maximum_bipartite_matching
 from scipy.spatial import cKDTree
+from homography import corner_distance, estimate_homography
 from interface import descriptor_size, keypoints_to_array
 from matching import matched_points
 from methods import extract_features, match_features
@@ -66,7 +69,7 @@ def gt_correspondences(p1: np.ndarray, pk: np.ndarray, H: np.ndarray, shape1, sh
     graph = csr_matrix((np.ones(len(near), dtype=np.int8), (near["i"], near["j"])), shape=(len(a), len(b)))
     matched = maximum_bipartite_matching(graph, perm_type="column")
     return int((matched >= 0).sum()), len(a), len(b)
- 
+
 # --------------------------------------------------- Métricas de um par
 
 def evaluate_pair(f1, fk, matches, t_match: float, pair, cfg: dict) -> dict:
@@ -78,6 +81,10 @@ def evaluate_pair(f1, fk, matches, t_match: float, pair, cfg: dict) -> dict:
     n_features = len(f1.kps)
     n_putative = len(matches)
     n_correct = int((match_errors(f1, fk, matches, pair.H) < eps).sum())
+
+    # homografia estimada com RANSAC a partir dos matches putativos (None se falhar)
+    H_est, inliers, reproj_err = estimate_homography(f1.kps, fk.kps, matches, cfg)
+    n_inliers = int(inliers.sum()) if H_est is not None else 0
 
     # tempos: média das duas imagens na deteção e na descrição; o matching é por par
     t_det = (f1.t_det + fk.t_det) / 2
@@ -93,6 +100,10 @@ def evaluate_pair(f1, fk, matches, t_match: float, pair, cfg: dict) -> dict:
         "precision": n_correct / n_putative if n_putative else 0.0,
         "matching_score": n_correct / n_features if n_features else 0.0,
         "recall": n_correct / n_corresp if n_corresp else np.nan,
+        "H_found": H_est is not None, "N_inliers": n_inliers,
+        "inlier_ratio": n_inliers / n_putative if n_putative else 0.0,
+        "reproj_err_px": reproj_err,
+        "corner_err_px": corner_distance(H_est, pair.H, pair.gray1),   # exatidão da homografia
         "t_det_ms": t_det, "t_desc_ms": t_desc, "t_match_ms": t_match,
         "t_total_ms": 2 * (t_det + t_desc) + t_match,
         "desc_dim": desc_dim, "desc_bytes_per_kp": desc_bytes_per_kp, "desc_mem_kb": desc_bytes / 1024,
@@ -140,11 +151,29 @@ def evaluate_pairs(methods, pairs, cfg: dict) -> pd.DataFrame:
 
 # -------------------------------------------------- Tabelas-Resumo
 
-def summarize(df: pd.DataFrame) -> dict:
-    """Médias por par, agrupadas por método e categoria  
+def homography_table(no_control: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    """T4: qualidade da homografia por método e categoria.
+
+    Inliers, rácio de inliers e erro de reprojeção: médias por par. Corner error: mediana, porque
+    uma homografia muito errada dá erros de milhares de px e dominaria a média. acc_<t>px: fração
+    dos pares com corner error <= t px; um par sem homografia conta como falhado.
+    """
+    by_category = no_control.groupby(["method", "category"])
+    t4 = by_category[["N_putative", "N_inliers", "inlier_ratio", "reproj_err_px"]].mean()
+    t4.insert(0, "n_pairs", by_category.size())
+    t4["H_found"] = by_category["H_found"].mean()
+    t4["corner_err_median_px"] = by_category["corner_err_px"].median()
+    for thr in cfg["eval"]["corner_thr_px"]:
+        t4[f"acc_{thr}px"] = (no_control["corner_err_px"] <= thr).groupby(
+            [no_control["method"], no_control["category"]]).mean()
+    return t4
+
+def summarize(df: pd.DataFrame, cfg: dict) -> dict:
+    """Médias por par, agrupadas por método e categoria
 
     T1_detection  nº de keypoints, correspondências ground-truth, repetibilidade
     T2_matching   contagens (denominadores) e PMR, precision, matching score, recall
+    T4_homography inliers do RANSAC, erro de reprojeção, corner error
     T5_cost       tempos, dimensão do descritor, memória
     F1_by_k       precision, matching score e repetibilidade por nível (par 1->k, ângulo ou escala)
     """
@@ -158,7 +187,10 @@ def summarize(df: pd.DataFrame) -> dict:
     t5 = no_control.groupby("method")[["t_det_ms", "t_desc_ms", "t_match_ms", "t_total_ms",
                                        "desc_dim", "desc_bytes_per_kp", "desc_mem_kb"]].mean()
     f1 = df.groupby(["method", "category", "k"])[["precision", "matching_score", "repeatability"]].mean()
-    return {"T1_detection": t1, "T2_matching": t2, "T5_cost": t5, "F1_by_k": f1}
+    tables = {"T1_detection": t1, "T2_matching": t2, "T5_cost": t5, "F1_by_k": f1}
+    if "corner_err_px" in df:   # as tabelas antigas (antes da T4) não têm estas colunas
+        tables["T4_homography"] = homography_table(no_control, cfg)
+    return tables
 
 def robustness_table(tables: dict) -> pd.DataFrame:
     # Tabela método x categoria (i, v, rot, scale) com as 4 métricas obrigatórias e a repetibilidade 

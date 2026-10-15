@@ -23,6 +23,7 @@ from studies.brief_study import plot_patterns
 from studies.curves import plot_level_curves, plot_tradeoff
 from studies.fast_study import plot_fast, run_fast_study, summarize_fast
 from studies.qualitative import run_qualitative
+from studies.matcher_study import run_matcher_study
 from studies.ransac_study import run_reference_study, run_threshold_study
 from studies.rot_scale_study import make_pairs
 from studies.stitching_study import run_stitching
@@ -32,15 +33,16 @@ def run_part1(cfg, prefix, seqs, methods):
     # Avalia os métodos em todos os pares do HPatches
     df = evaluate_pairs(methods, hpatches_pairs(cfg, seqs), cfg)
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}raw.csv", index=False)
-    tables = summarize(df)
+    tables = summarize(df, cfg)
     save_tables(tables, cfg["paths"]["tables"], prefix)
     print(tables["T2_matching"].round(3).to_string())
+    print(tables["T4_homography"].round(3).to_string())
  
 def run_rotscale(cfg, prefix, methods):
     # Avalia os métodos no teste sintético de rotação e escala
     df = evaluate_pairs(methods, make_pairs(cfg), cfg)
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}rotscale_raw.csv", index=False)
-    tables = summarize(df)
+    tables = summarize(df, cfg)
     save_tables(tables, cfg["paths"]["tables"], prefix + "rotscale_")
     print(tables["T2_matching"].round(3).to_string())
  
@@ -49,7 +51,7 @@ def run_robustness(cfg, prefix):
     tables_dir = cfg["paths"]["tables"]
     df = pd.concat([pd.read_csv(tables_dir / f"{prefix}raw.csv"),
                     pd.read_csv(tables_dir / f"{prefix}rotscale_raw.csv")], ignore_index=True)
-    table = robustness_table(summarize(df))
+    table = robustness_table(summarize(df, cfg))
     table.to_csv(tables_dir / f"{prefix}robustness.csv", float_format="%.4f")
     print(table.round(3).to_string())
  
@@ -59,7 +61,8 @@ def run_graf(cfg, prefix, methods):
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}graf_raw.csv", index=False)
     df["pair"] = "1->" + df["k"].astype(str)
     columns = ["N_features", "N_putative", "N_correct", "N_corresp", "PMR", "precision", "matching_score",
-               "recall", "repeatability", "t_det_ms", "t_desc_ms", "t_match_ms"]
+               "recall", "repeatability", "N_inliers", "inlier_ratio", "reproj_err_px", "corner_err_px",
+               "t_det_ms", "t_desc_ms", "t_match_ms"]
     table = df.set_index(["method", "pair"])[columns]
     table.to_csv(cfg["paths"]["tables"] / f"{prefix}graf_pairs.csv", float_format="%.4f")
     print(table.round(3).to_string())
@@ -81,7 +84,7 @@ def run_brief(cfg, prefix, seqs):
     df = pd.concat([evaluate_pairs(methods, hpatches_pairs(cfg, seqs), cfg),
                     evaluate_pairs(methods, make_pairs(cfg), cfg)], ignore_index=True)
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}brief_raw.csv", index=False)
-    tables = summarize(df)
+    tables = summarize(df, cfg)
     save_tables({name: tables[name] for name in ("T2_matching", "T5_cost", "F1_by_k")},
                 cfg["paths"]["tables"], prefix + "brief_")
     t7 = robustness_table(tables).reindex(methods)
@@ -108,7 +111,7 @@ def run_curves(cfg, prefix):
         print(f"{name}: {len(captions)} figuras em {folder}")
 
 def run_part2(cfg, prefix, methods):
-    #Parte 2: stitching com várias configurações (tabela T8), estudo do limiar do RANSAC e
+    # Parte 2: stitching com várias configurações (tabela T8), estudo do limiar do RANSAC e
     # comparação de imagens de referência. Os panoramas ficam em results/panoramas/ 
     
     tables_dir, figures_dir = cfg["paths"]["tables"], cfg["paths"]["figures"]
@@ -128,6 +131,11 @@ def run_part2(cfg, prefix, methods):
     table.to_csv(tables_dir / f"{prefix}reference.csv", index=False, float_format="%.4f")
     save_captions(captions, figures_dir / "reference_study" / "legendas.md", "imagem de referência")
     print(table.round(3).to_string(index=False))
+    
+    table, captions = run_matcher_study(cfg)
+    table.to_csv(tables_dir / f"{prefix}matcher_bf_flann.csv", index=False, float_format="%.4f")
+    save_captions(captions, figures_dir / "matcher_study" / "legendas.md", "força bruta vs FLANN")
+    print(table.drop(columns=["panorama_w", "panorama_h"]).round(3).to_string(index=False))
     
 def main():
     parser = argparse.ArgumentParser(description="Assignment #1 IAVC")

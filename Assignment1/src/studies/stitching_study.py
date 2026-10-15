@@ -1,21 +1,13 @@
-"""Stitching com várias configurações: tabela T8, figuras e panoramas
-
-Para cada conjunto de imagens e cada método:
-  results/figures/stitching/<conjunto>/keypoints/<método>.jpg      keypoints na imagem de referência
-  results/figures/stitching/<conjunto>/inliers_<i>-<j>/<método>.jpg  inliers (verde) e outliers do RANSAC
-  results/panoramas/<conjunto>/<método>.jpg                        panorama, referência central, média
-"""
+# Stitching com várias configurações: tabela, figuras e panoramas
 
 from pathlib import Path 
 import pandas as pd 
 from datasets import imwrite
-from homography import chain_to_reference
 from methods import extract_features
-from stitching import estimate_adjacent, load_panorama_images, match_adjacent, stitch_images
+from stitching import estimate_adjacent, load_panorama_images, match_adjacent, stitch_or_none
 from studies.curves import comma
 from studies.qualitative import file_name
 from visualization import plot_keypoints, plot_matches, save_figure
-
 
 def matching_text(method: str, cfg: dict) -> str:
     # Como foram obtidos os matches putativos de um método, para as legendas 
@@ -30,11 +22,9 @@ def ransac_text(cfg: dict) -> str:
             f"e confiança {comma(ransac['confidence'])}")
  
 def run_stitching(methods, cfg: dict):
-    """Corre o pipeline completo em todos os conjuntos. Devolve (tabela, legendas).
-
-    A tabela tem uma linha por (conjunto, método, par de imagens adjacentes) com o nº de matches,
-    o nº e o rácio de inliers e o erro médio de reprojeção dos inliers
-    """
+    # A tabela tem uma linha por (conjunto, método, par de imagens adjacentes) com o nº de matches,
+    # o nº e o rácio de inliers e o erro médio de reprojeção dos inliers
+    
     figures = Path(cfg["paths"]["figures"]) / "stitching"
     max_lines = cfg["qualitative"]["max_matches_drawn"]
     rows, captions = [], []
@@ -50,13 +40,9 @@ def run_stitching(methods, cfg: dict):
             pairs = estimate_adjacent(features, matches, cfg)
 
             # panorama: só se todas as homografias foram estimadas e o canvas tem um tamanho razoável
-            panorama = None
-            if all(pair["H"] is not None for pair in pairs):
-                try:
-                    panorama = stitch_images(images, chain_to_reference([pair["H"] for pair in pairs], ref))
-                    imwrite(Path(cfg["paths"]["panoramas"]) / set_name / file_name(method), panorama)
-                except ValueError as error:
-                    print(f"{set_name} {method}: {error}")
+            panorama = stitch_or_none(images, pairs, ref)
+            if panorama is not None:
+                imwrite(Path(cfg["paths"]["panoramas"]) / set_name / file_name(method), panorama)
 
             fig = plot_keypoints(images[ref], features[ref].kps,
                                  f"{method} — {len(features[ref].kps)} keypoints", f"{set_name} — {names[ref]}")

@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-
 import cv2
 import numpy as np
 
@@ -50,7 +49,6 @@ def list_sequences(root, categories, only=None) -> list[str]:
     return seqs
 
 def hpatches_pairs(cfg: dict, only=None):
-    # Gera os pares (imagem 1, imagem k) do HPatches, sequência a sequência
     root = Path(cfg["paths"]["hpatches"])
     for seq in list_sequences(root, cfg["eval"]["categories"], only):
         bgr1, gray1 = load_image(root / seq / "1.ppm")
@@ -63,7 +61,6 @@ GRAF_FILES = {2: "img2.ppm", 3: "img4.ppm"}
 GRAF_HOMOGRAPHIES = {2: "H1to2p.txt", 3: "H1to4p.txt"}
 
 def load_graf_pairs(cfg: dict) -> list[ImagePair]:
-    # Os dois pares GRAF: imagem 1 -> imagem 2 e imagem 1 -> imagem 3 
     root = Path(cfg["paths"]["graf"])
     bgr1, gray1 = load_image(root / "img1.ppm")
     pairs = []
@@ -74,5 +71,4 @@ def load_graf_pairs(cfg: dict) -> list[ImagePair]:
     return pairs
 
 def load_image_set(folder, pattern: str = "*.jpg"):
-    # Lê as imagens de uma pasta por ordem de nome (para os panoramas). Devolve [(nome, BGR), ...] 
     return [(p.name, imread(p)) for p in sorted(Path(folder).glob(pattern))]

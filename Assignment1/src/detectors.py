@@ -4,7 +4,6 @@ import time
 import cv2
 
 def create_detector(name: str, cfg: dict):
-    # Cria o detetor do OpenCV  
     params = cfg["detectors"][name]
     if name == "SIFT":
         return cv2.SIFT_create(**params)

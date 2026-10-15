@@ -1,7 +1,6 @@
 # Formato comum do resultado de detetar + descrever uma imagem  
 
 from dataclasses import dataclass
-
 import numpy as np
 
 @dataclass

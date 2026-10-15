@@ -1,13 +1,12 @@
-# Parâmetros de todas as experiências num único sítio   
+# Parâmetros de todas as experiências    
 import copy
-from pathlib import Path
-
+from pathlib import Path 
 import cv2
  
 ROOT = Path(__file__).resolve().parents[1]
 
 CFG = {
-    "seed": 0,   # D07
+    "seed": 0,    
 
     "paths": {
         "hpatches": ROOT / "data" / "hpatches-sequences-release",
@@ -23,10 +22,15 @@ CFG = {
         "eps_px": 3.0,                # match correto se o erro com a H ground-truth for < 3 px
         "pairs_k": [2, 3, 4, 5, 6],   # pares 1->k de cada sequência HPatches
         "categories": ["i", "v"],     # iluminação / ponto de vista
+        "corner_thr_px": [1, 3, 5],   # T4: % de pares com corner error da homografia abaixo destes valores
     },
 
     # Matching: ratio test de Lowe + cross-check (emparelhamento 1-para-1)
-    "matching": {"ratio": 0.8},
+    "matching": {
+        "ratio": 0.8,
+        # FLANN (só no estudo força bruta vs aproximado): KD-tree nos float, LSH nos binários
+        "flann": {"kdtree_trees": 5, "lsh_tables": 6, "lsh_key_size": 12, "lsh_multi_probe": 1, "checks": 50},
+    },
 
     # Limite de keypoints por imagem, igual para todos os métodos. None = sem limite.
     "max_keypoints": 2000,
@@ -75,28 +79,34 @@ CFG = {
     # Figuras qualitativas 
     "qualitative": {"max_matches_drawn": 150},
 
-    # RANSAC (Pessoa B)
+    # RANSAC  
     "ransac": {"thr_px": 3.0, "max_iters": 2000, "confidence": 0.995},
 
-    # Métodos aprendidos (Pessoa B): SuperPoint e LightGlue
+    # Métodos aprendidos: SuperPoint e LightGlue
     "learned": {
-        "device": None,    # None = "cuda" se existir, senão "cpu"
-        "resize": None,    # None = resolução original, como nos métodos clássicos
+        "device": None,    
+        "resize": None,    
         # LightGlue: confiança mínima de um match e paragem antecipada (valores por omissão do pacote)
         "lightglue": {"filter_threshold": 0.1, "depth_confidence": 0.95, "width_confidence": 0.99},
     },
 
-    # Parte 2: stitching (Pessoa B)
+    # Parte 2: stitching 
     "stitching": {
         # conjuntos de imagens: uma pasta cada, imagens .jpg por ordem de nome (esquerda -> direita)
-        "sets": {"keble": ROOT / "data" / "Panorama", "proprio": ROOT / "data" / "panorama2"},
+        "sets": {"keble": ROOT / "data" / "Panorama",
+         "proprio1": ROOT / "data" / "panorama2" / "seq1",
+         "proprio2": ROOT / "data" / "panorama2" / "seq2",
+         "proprio3": ROOT / "data" / "panorama2" / "seq3"},
         "max_side": 1000,   # fotografias com o lado maior acima disto são reduzidas (px)
-        # configurações comparadas: descritor float, binário e duas aprendidas (enunciado §3: pelo menos 3)
+        # configurações comparadas: descritor float, binário e duas aprendidas
         "methods": ["SIFT", "ORB", "KAZE", "SuperPoint+NN", "SuperPoint+LightGlue"],
         # estudo do limiar do RANSAC; os panoramas lado a lado são os do "study_method"
         "ransac_thresholds_px": [0.5, 1.0, 2.0, 3.0, 5.0, 10.0],
         "study_set": "keble",
         "study_method": "SIFT",   # também usado na comparação de imagens de referência
+        # força bruta vs FLANN: dois float (KD-tree) e um binário (LSH).
+        # O tempo de matching de cada par é a mediana de "repeats" medições, depois de um aquecimento.
+        "matcher_study": {"methods": ["SIFT", "KAZE", "ORB"], "repeats": 5},
     },
 }
 

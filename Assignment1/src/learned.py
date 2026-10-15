@@ -2,7 +2,7 @@
 
 Implementação e pesos pré-treinados: pacote cvg/LightGlue (Lindenberger, Sarlin e Pollefeys, ICCV 2023). 
 
-Papéis (enunciado §2.6):
+Papéis:
   - SuperPoint é um detetor + descritor: uma rede dá, numa só passagem, os keypoints e os descritores
     de 256 valores. Por isso não há tempos separados: t_det é o tempo total e t_desc é 0.
   - LightGlue é só um matcher: recebe os keypoints e os descritores das duas imagens e devolve os pares.
@@ -19,20 +19,13 @@ import cv2
 import torch
 from lightglue import SIFT, LightGlue, SuperPoint 
 from interface import Features
-
-# Pesos usados por cada extrator e pelo matcher correspondente  
-CHECKPOINTS = {
-    "superpoint": "superpoint_v1 (Magic Leap) + superpoint_lightglue (cvg/LightGlue v0.1_arxiv)",
-    "sift": "sift_lightglue (cvg/LightGlue v0.1_arxiv)",
-}
-
+ 
 EXTRACTORS = {"superpoint": SuperPoint, "sift": SIFT}
 
 # Features.method de cada extrator; o LightGlue usa-o para escolher os pesos
 METHOD_NAMES = {"superpoint": "SuperPoint", "sift": "SIFT-LG"}
 
-_models = {} # modelos já carregados, para não os carregar em cada imagem
-
+_models = {} 
 
 def get_device(cfg: dict) -> str: 
     return cfg["learned"]["device"] or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -88,7 +81,6 @@ def extract_learned(kind: str, gray, cfg: dict) -> Features:
 def extract_superpoint(gray, cfg: dict) -> Features:
     # SuperPoint: descritores float32 (N, 256), comparados com a distância L2 
     return extract_learned("superpoint", gray, cfg)
-
 
 def extract_sift_lg(gray, cfg: dict) -> Features:
     # SIFT do pacote LightGlue: descritores RootSIFT float32 (N, 128) 

@@ -1002,7 +1002,7 @@ Entradas D29–D38, escritas em 2026-10-14 sobre o código do commit `4615590` (
   não linear), SuperPoint+NN e SuperPoint+LightGlue. O enunciado pede pelo menos 3 configurações
   substancialmente diferentes, incluindo uma aprendida (§3). FAST+X e SIFT+LightGlue ficaram de fora
   por escolha nossa; correm com `--methods`.
-- **Por fazer:** a comparação força bruta vs vizinho aproximado (FLANN) do passo 4 (P12).
+- **Força bruta vs vizinho aproximado (passo 4):** estudo à parte na D39; o pipeline usa a força bruta.
 
 ### D34 — Resultados do stitching (corrida de 2026-10-13)
 - **Estado:** Feita. Tabela `results/tables/stitching_T8.csv`; figuras em
@@ -1161,6 +1161,51 @@ Entradas D29–D38, escritas em 2026-10-14 sobre o código do commit `4615590` (
 - **Cuidados (D28):** máquina ligada à corrente, sem outros programas; `--part1` e `--fast` em
   separado. Os pesos têm de estar na cache antes (a primeira execução descarrega-os).
 
+### D39 — Força bruta vs vizinho aproximado (FLANN) no stitching (§3.1, passo 4)
+- **Estado:** Implementada e corrida em 2026-10-15 (`studies/matcher_study.run_matcher_study`, dentro do
+  `--part2`). Resolve P12. Tabela `results/tables/matcher_bf_flann.csv`; figuras
+  `results/figures/matcher_study/<conjunto>.jpg` (SIFT, BF e FLANN) com `legendas.md`; panoramas em
+  `results/panoramas/matcher/`.
+- **Desenho:** os mesmos keypoints e descritores; muda só a pesquisa de vizinhos
+  (`matching.match_descriptors(..., matcher="bf" | "flann")`). O ratio 0,8, o cross-check e o RANSAC de
+  3 px são iguais. FLANN com os valores do tutorial do OpenCV (`CFG["matching"]["flann"]`): 5 KD-trees
+  aleatórias nos float (SIFT, KAZE), LSH (6 tabelas, chave de 12 bits, multi-probe 1) no binário (ORB),
+  `checks` = 50. Os tempos são a mediana de 5 medições depois de um aquecimento e incluem a construção
+  dos índices (duas por par, por causa do cross-check). Por par regista-se também `shared_with_bf`
+  (fração dos matches FLANN que existem na força bruta) e `corner_diff_px` (distância média dos 4
+  cantos projetados com a H do FLANN e com a H da força bruta).
+- **Resultados** (PC da Inês, CPU; pares 1→2 / 2→3):
+
+  | Conjunto | Método | tempo BF (ms) | tempo FLANN (ms) | matches BF / FLANN | matches FLANN também na BF | diferença dos cantos (px) |
+  |---|---|---|---|---|---|---|
+  | keble | SIFT | 13 / 14 | 72 / 71 | 547, 617 / 545, 622 | 0,99 / 0,99 | 0,3 / 0,4 |
+  | keble | KAZE | 6 / 5 | 44 / 43 | 703, 646 / 701, 646 | 1,00 / 0,99 | 0,5 / 0,2 |
+  | keble | ORB | 9 / 10 | 21 / 20 | 543, 536 / 550, 520 | 0,94 / 0,96 | 3,6 / 4,3 |
+  | proprio | SIFT | 13 / 13 | 76 / 73 | 197, 307 / 197, 303 | 1,00 / 0,98 | 0,7 / 10,2 |
+  | proprio | KAZE | 9 / 9 | 55 / 58 | 316, 228 / 314, 233 | 0,99 / 0,94 | 3,2 / 4,9 |
+  | proprio | ORB | 10 / 9 | 20 / 19 | 210, 152 / 216, 157 | 0,95 / 0,92 | 3,7 / 19,7 |
+
+  Os tempos variam entre corridas (na 2.ª, a força bruta do SIFT no keble deu 16 e 20 ms); os matches
+  e as homografias repetem-se exatamente (FLANN determinístico nesta configuração, verificado com 2
+  corridas).
+- **Observações para o relatório:**
+  - **O FLANN foi 2 a 7 vezes mais lento.** Com ≤ 2000 descritores por imagem, construir as árvores
+    custa mais do que a força bruta otimizada do OpenCV. O vizinho aproximado só compensa com conjuntos
+    muito maiores (não testado aqui).
+  - **Matches quase iguais:** 98–100% dos matches FLANN dos float existem na força bruta, e 92–96% no
+    ORB (o LSH é mais aproximado). O nº de inliers muda no máximo 15 (KAZE `proprio` 1→2).
+  - **Panoramas:** iguais à vista no `keble` (cantos a ≤ 0,5 px nos float). As diferenças maiores
+    (10 px no SIFT e 20 px no ORB, `proprio` 2→3) **não são do FLANN**: tirando 2% dos matches da força
+    bruta ao acaso (20 repetições), a H já muda tanto ou mais (mediana / máximo: SIFT 2,2 / 10,8 px; ORB
+    20,1 / 41,6 px nesse par; ≤ 2,3 px nos float do `keble`). Estes pares têm homografias pouco
+    estáveis, e os cantos estão longe da zona de sobreposição, onde a H é extrapolada.
+  - **Escolha:** força bruta em todas as experiências. É exata, é mais rápida com estes tamanhos, e as
+    diferenças entre métodos não se confundem com erros da pesquisa aproximada (D16).
+- **Nota sobre a D32:** o `cv2.findHomography` não usa o RNG global. Mudar `cv2.setRNGSeed` (seeds 0 a
+  10) não alterou nenhuma H, porque o RANSAC do OpenCV usa um gerador interno com seed fixa. O resultado
+  já era determinístico; o `setRNGSeed` no `estimate_homography` não faz mal, mas não é ele que o garante.
+- **Limitação:** 2 conjuntos e 3 métodos; tempos numa só máquina, numa só corrida.
+
 ## Ambiente e repositório
 
 ### D13 — Ambiente Python
@@ -1236,9 +1281,8 @@ Entradas D29–D38, escritas em 2026-10-14 sobre o código do commit `4615590` (
   (`data/hpatches-sequences-release/hpatches-sequences-release/<seq>/`): a avaliação não encontra
   nenhuma sequência e o `--part1` falha com `KeyError: 'control'` (tabela vazia). Se a corrida oficial
   for nessa máquina, subir a pasta interior um nível antes (D04).
-- **P12 (2026-10-14)** — **Força bruta vs vizinho aproximado no stitching por fazer** (Pessoa B). O
-  passo 4 do §3.1 pede para investigar os dois nos descritores float; a opção FLANN foi retirada na D27.
-  Basta uma comparação pequena (ex.: SIFT no `keble`: matches, inliers, tempo).
+- **P12 (2026-10-14)** — ~~Força bruta vs vizinho aproximado no stitching por fazer~~ Feito em
+  2026-10-15 (D39): SIFT, KAZE e ORB nos dois conjuntos, dentro do `--part2`.
 - **P13 (2026-10-14)** — `tests/test_sanity.py` não cobre os métodos aprendidos, a homografia nem o
   stitching. As verificações da secção 3 do VERIFICACOES.md foram feitas com scripts à parte; passá-las
   para o teste é opcional.

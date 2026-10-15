@@ -1,12 +1,6 @@
 # Documentos
 Docs/
 
-# Clone local do repositório LightGlue (o pacote é instalado via pip)
-Assignment1/data/LightGlue/
-
-# Dataset HPatches (não vai no repositório nem na entrega)
-Assignment1/data/
-
 # Python
 __pycache__/
 *.pyc

@@ -27,6 +27,7 @@ from studies.brief_study import plot_patterns
 from studies.curves import plot_level_curves, plot_tradeoff
 from studies.fast_study import plot_fast, run_fast_study, summarize_fast
 from studies.qualitative import run_qualitative
+from studies.matcher_study import run_matcher_study
 from studies.ransac_study import run_reference_study, run_threshold_study
 from studies.rot_scale_study import make_pairs
 from studies.stitching_study import run_stitching
@@ -120,8 +121,8 @@ def run_curves(cfg, prefix):
 
 
 def run_part2(cfg, prefix, methods):
-    """Parte 2: stitching com várias configurações (tabela T8), estudo do limiar do RANSAC e
-    comparação de imagens de referência. Os panoramas ficam em results/panoramas/."""
+    """Parte 2: stitching com várias configurações (tabela T8), estudo do limiar do RANSAC,
+    comparação de imagens de referência e força bruta vs FLANN. Os panoramas ficam em results/panoramas/."""
     tables_dir, figures_dir = cfg["paths"]["tables"], cfg["paths"]["figures"]
     tables_dir.mkdir(parents=True, exist_ok=True)
 
@@ -139,6 +140,11 @@ def run_part2(cfg, prefix, methods):
     table.to_csv(tables_dir / f"{prefix}reference.csv", index=False, float_format="%.4f")
     save_captions(captions, figures_dir / "reference_study" / "legendas.md", "imagem de referência")
     print(table.round(3).to_string(index=False))
+
+    table, captions = run_matcher_study(cfg)
+    table.to_csv(tables_dir / f"{prefix}matcher_bf_flann.csv", index=False, float_format="%.4f")
+    save_captions(captions, figures_dir / "matcher_study" / "legendas.md", "força bruta vs FLANN")
+    print(table.drop(columns=["panorama_w", "panorama_h"]).round(3).to_string(index=False))
 
 
 def main():

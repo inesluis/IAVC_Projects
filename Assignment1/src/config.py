@@ -31,7 +31,12 @@ CFG = {
     },
 
     # Matching (enunciado §2.8): ratio test de Lowe + cross-check (emparelhamento 1-para-1)
-    "matching": {"ratio": 0.8},
+    # O FLANN (vizinho aproximado) só é usado no estudo força bruta vs FLANN do stitching (P12);
+    # valores do tutorial de matching do OpenCV (KD-trees para float, LSH para binários).
+    "matching": {
+        "ratio": 0.8,
+        "flann": {"kdtree_trees": 5, "lsh_tables": 6, "lsh_key_size": 12, "lsh_multi_probe": 1, "checks": 50},
+    },
 
     # Limite de keypoints por imagem, igual para todos os métodos (D05). None = sem limite.
     "max_keypoints": 2000,
@@ -102,6 +107,9 @@ CFG = {
         "ransac_thresholds_px": [0.5, 1.0, 2.0, 3.0, 5.0, 10.0],
         "study_set": "keble",
         "study_method": "SIFT",   # também usado na comparação de imagens de referência (§3.3)
+        # força bruta vs FLANN (§3.1, passo 4; P12): dois float (KD-tree) e um binário (LSH).
+        # O tempo de matching de cada par é a mediana de "repeats" medições, depois de um aquecimento.
+        "matcher_study": {"methods": ["SIFT", "KAZE", "ORB"], "repeats": 5},
     },
 }
 

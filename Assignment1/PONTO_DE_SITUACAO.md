@@ -255,8 +255,8 @@ Testei os aprendidos na tua avaliação (4 sequências + sintético): correm sem
 - **Ficheiros teus que alterei:** `interface.py` (campo `raw`), `methods.py` e `main.py` (ligação dos
   aprendidos e `--part2`), `visualization.py` (nova `plot_image_grid`), `curves.py` (mais 2
   marcadores, para 9 métodos), `config.py` (secções `learned`, `ransac` e `stitching`).
-- **Numeração no DECISOES.md:** usei D29–D38 e P11–P13. As tuas próximas entradas começam em D39 e
-  P14.
+- **Numeração no DECISOES.md:** usei D29–D39 e P11–P13. As tuas próximas entradas começam em D40 e
+  P14 (a D39, força bruta vs FLANN, foi acrescentada em 15/10).
 
 ### 7.4 O que falta
 
@@ -264,5 +264,5 @@ Testei os aprendidos na tua avaliação (4 sequências + sintético): correm sem
 |---|---|
 | T4 em `evaluation.py` (P05) | Carolina |
 | Combinar a máquina e fazer a corrida oficial (D38) | As duas |
-| Força bruta vs FLANN no stitching (P12) | Inês |
+| ~~Força bruta vs FLANN no stitching (P12)~~ Feito em 15/10 (D39) | Inês |
 | Relatório: métodos aprendidos, RANSAC, resultados da Parte 2 | Inês |

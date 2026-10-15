@@ -1,6 +1,9 @@
 # Datasets (HPatches, GRAF, panoramas) — nunca fazer commit
 data/
 
+# Resultados
+results/
+
 # Python
 __pycache__/
 

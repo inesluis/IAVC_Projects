@@ -1,0 +1,17 @@
+set,method,pair,image1,image2,N_kps1,N_kps2,N_matches,N_inliers,inlier_ratio,reproj_err_px,panorama_w,panorama_h
+keble,SIFT,1->2,keble_a.jpg,keble_b.jpg,2000,2000,547,458,0.8373,0.5066,1502,669
+keble,SIFT,2->3,keble_b.jpg,keble_c.jpg,2000,2000,617,535,0.8671,0.5075,1502,669
+keble,ORB,1->2,keble_a.jpg,keble_b.jpg,2000,2000,543,496,0.9134,0.9902,1491,669
+keble,ORB,2->3,keble_b.jpg,keble_c.jpg,2000,2000,536,457,0.8526,0.9316,1491,669
+proprio1,SIFT,1->2,panorama1_1.jpg,panorama1_2.jpg,2000,2000,309,279,0.9029,0.4615,1758,1105
+proprio1,SIFT,2->3,panorama1_2.jpg,panorama1_3.jpg,2000,2000,197,130,0.6599,0.5717,1758,1105
+proprio1,ORB,1->2,panorama1_1.jpg,panorama1_2.jpg,2000,2000,156,136,0.8718,0.8284,1769,1144
+proprio1,ORB,2->3,panorama1_2.jpg,panorama1_3.jpg,2000,2000,202,139,0.6881,0.9999,1769,1144
+proprio2,SIFT,1->2,panorama2_1.jpg,panorama2_2.jpg,1007,2000,263,243,0.9240,0.3688,1065,1111
+proprio2,SIFT,2->3,panorama2_2.jpg,panorama2_3.jpg,2000,2000,825,810,0.9818,0.2738,1065,1111
+proprio2,ORB,1->2,panorama2_1.jpg,panorama2_2.jpg,1853,2000,131,113,0.8626,0.7961,1054,1100
+proprio2,ORB,2->3,panorama2_2.jpg,panorama2_3.jpg,2000,2000,786,758,0.9644,0.8967,1054,1100
+proprio3,SIFT,1->2,panorama3_1.jpg,panorama3_2.jpg,2000,2000,383,346,0.9034,0.5542,2052,1627
+proprio3,SIFT,2->3,panorama3_2.jpg,panorama3_3.jpg,2000,2000,538,502,0.9331,0.6886,2052,1627
+proprio3,ORB,1->2,panorama3_1.jpg,panorama3_2.jpg,2000,2000,333,293,0.8799,1.0682,2025,1529
+proprio3,ORB,2->3,panorama3_2.jpg,panorama3_3.jpg,2000,2000,387,330,0.8527,1.3180,2025,1529

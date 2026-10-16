@@ -1,0 +1,13 @@
+set,method,ref,ref_image,max_compositions,area_scale_1,area_scale_2,area_scale_3,canvas_w,canvas_h,canvas_mpx
+keble,SIFT,1,keble_a.jpg,2,1.0000,1.1450,1.8910,1716,882,1.5135
+keble,SIFT,2,keble_b.jpg,1,1.1563,1.0000,1.1728,1502,669,1.0048
+keble,SIFT,3,keble_c.jpg,2,1.9492,1.1823,1.0000,1733,894,1.5493
+proprio1,SIFT,1,panorama1_1.jpg,2,1.0000,1.0249,1.1226,1813,1096,1.9870
+proprio1,SIFT,2,panorama1_2.jpg,1,1.0516,1.0000,1.0368,1758,1105,1.9426
+proprio1,SIFT,3,panorama1_3.jpg,2,1.2178,1.0443,1.0000,1814,1196,2.1695
+proprio2,SIFT,1,panorama2_1.jpg,2,1.0000,1.0215,1.0509,1078,1092,1.1772
+proprio2,SIFT,2,panorama2_2.jpg,1,1.0293,1.0000,1.0064,1065,1111,1.1832
+proprio2,SIFT,3,panorama2_3.jpg,2,1.0666,1.0074,1.0000,1076,1131,1.2170
+proprio3,SIFT,1,panorama3_1.jpg,2,1.0000,1.4839,21.6637,6005,6046,36.3062
+proprio3,SIFT,2,panorama3_2.jpg,1,1.4944,1.0000,1.8148,2052,1627,3.3386
+proprio3,SIFT,3,panorama3_3.jpg,2,20.9361,1.8607,1.0000,6240,5971,37.2590

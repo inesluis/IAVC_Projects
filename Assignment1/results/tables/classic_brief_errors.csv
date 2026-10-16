@@ -1,0 +1,1 @@
+,pipeline,seq,category,k,control,N_kps1,N_kpsk,N_detected1,N_vis1,N_visk,N_corresp,repeatability,N_features,N_putative,N_correct,PMR,precision,matching_score,recall,mean_err_correct_px,t_det_ms,t_desc_ms,t_match_ms,t_total_ms,joint_timing,desc_dim,desc_bytes_per_kp,desc_mem_kb,binary,matcher,error

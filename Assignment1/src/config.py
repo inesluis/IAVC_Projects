@@ -88,6 +88,10 @@ CFG = {
         "resize": None,    
         # LightGlue: confiança mínima de um match e paragem antecipada (valores por omissão do pacote)
         "lightglue": {"filter_threshold": 0.1, "depth_confidence": 0.95, "width_confidence": 0.99},
+        # SuperGlue (implementação do Hugging Face transformers): pesos "outdoor" e os valores do
+        # SuperGlue original (match_threshold 0.2, 100 iterações de Sinkhorn)
+        "superglue": {"weights": "magic-leap-community/superglue_outdoor", "match_threshold": 0.2,
+                      "sinkhorn_iterations": 100},
     },
 
     # Parte 2: stitching 
@@ -99,7 +103,7 @@ CFG = {
          "proprio3": ROOT / "data" / "panorama2" / "seq3"},
         "max_side": 1000,   # fotografias com o lado maior acima disto são reduzidas (px)
         # configurações comparadas: descritor float, binário e duas aprendidas
-        "methods": ["SIFT", "ORB", "KAZE", "SuperPoint+NN", "SuperPoint+LightGlue"],
+        "methods": ["SIFT", "ORB", "KAZE", "SuperPoint+NN", "SuperPoint+SuperGlue", "SuperPoint+LightGlue"],
         # estudo do limiar do RANSAC; os panoramas lado a lado são os do "study_method"
         "ransac_thresholds_px": [0.5, 1.0, 2.0, 3.0, 5.0, 10.0],
         "study_set": "keble",

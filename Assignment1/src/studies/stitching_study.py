@@ -14,6 +14,9 @@ def matching_text(method: str, cfg: dict) -> str:
     if method.endswith("LightGlue"):
         threshold = comma(cfg["learned"]["lightglue"]["filter_threshold"])
         return f"matches do LightGlue (confiança mínima {threshold})"
+    if method.endswith("SuperGlue"):
+        threshold = comma(cfg["learned"]["superglue"]["match_threshold"])
+        return f"matches do SuperGlue (confiança mínima {threshold})"
     return f"ratio test {comma(cfg['matching']['ratio'])} + cross-check"
  
 def ransac_text(cfg: dict) -> str:

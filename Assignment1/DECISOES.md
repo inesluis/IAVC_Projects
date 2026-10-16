@@ -867,6 +867,82 @@ vista, escala e rotação; nenhuma estratégia aguenta rotações de 30°.
 - **A atualizar depois da corrida oficial:** todas as tabelas e figuras (faltam os métodos aprendidos e
   a tabela da homografia).
 
+### D40 — Métricas da homografia na Parte 1: tabela T4 (2026-10-15)
+- **Estado:** Implementada (resolve P05). Número D40 para não colidir com as D30–D39 da Inês.
+- **O que o enunciado pede (§2.7):** "homography estimation accuracy", "number of RANSAC inliers" e
+  "average reprojection/residual error of inliers", por método e por categoria.
+- **Implementação:** em `evaluation.evaluate_pair`, a homografia é estimada com
+  `homography.estimate_homography` (Pessoa B) sobre os matches putativos, com os parâmetros de
+  `cfg["ransac"]` (limiar 3 px, 2000 iterações, confiança 0,995, seed fixa). Colunas novas por par:
+  `H_found`, `N_inliers`, `inlier_ratio` (= N_inliers / N_putative), `reproj_err_px` (erro médio dos
+  inliers) e `corner_err_px`. A tabela `T4_homography` (em `summarize`) tem as médias por método e
+  categoria, a fração de pares com homografia, a mediana do corner error e `acc_1px`, `acc_3px`,
+  `acc_5px`. Também nas tabelas do GRAF (`graf_pairs.csv`).
+- **Exatidão da homografia = corner error:** distância média entre os 4 cantos da imagem 1
+  projetados com a H estimada e com a H ground-truth. O enunciado não define a medida; esta é a do
+  guia e a usada no HPatches/SuperPoint (homography estimation accuracy com limiares de 1, 3 e 5 px).
+  Mede o efeito da H na imagem toda, e não só nos pontos usados para a estimar.
+- **Escolhas próprias:**
+  - **Limiar do RANSAC = 3 px:** igual ao critério de correção de um match (`eps_px`), para que
+    "inlier" e "correto" usem a mesma tolerância.
+  - **Mediana do corner error, não média:** uma homografia muito errada dá erros de milhares de px e
+    dominaria a média. Os `acc_<t>px` dão a distribuição.
+  - **Par sem homografia** (menos de 4 matches ou falha do RANSAC): `N_inliers = 0`, erros a `nan`, e
+    conta como falhado nos `acc_<t>px`.
+  - Limiares 1/3/5 px em `cfg["eval"]["corner_thr_px"]`.
+- **Teste (i_nescafe e v_graffiti, SIFT e ORB):** nos pares de iluminação, N_inliers ≈ N_correct e
+  corner error mediano < 0,5 px (acc_3px = 1); no ponto de vista, o erro é maior (SIFT 4,3 px,
+  ORB 12,5 px), como esperado. Os ficheiros do teste foram apagados.
+
+### D41 — Corrida final (2026-10-15)
+- **Comando:** `python -u main.py --part1 --rotscale --robustness --graf --qualitative --fast --brief
+  --curves --part2 --tag final`, no env `cvc`; log em `results/tables/final_run.log`. Clássicos no CPU
+  (i7-12650H), aprendidos na GPU (RTX 3050 Ti Laptop, torch 2.14.1+cu126).
+- **Cobertura:** 9 métodos × 580 pares do HPatches (285 i, 295 v) e × 23 pares sintéticos; GRAF;
+  stitching em 4 conjuntos (keble, proprio1–3) com 5 configurações; estudos do RANSAC, da referência e
+  BF vs FLANN.
+- **Verificações:** as métricas dos 6 clássicos são iguais às da corrida de 12 de outubro em 100 % dos
+  pares (código determinístico), e as do FAST (T6) e do BRIEF (T7) também. Os tempos dos clássicos
+  subiram cerca de 20 % no `--part1` e desceram no `--fast`: variação da máquina, não do código.
+- **Anomalia dos tempos na GPU:** o extrator do SuperPoint é o mesmo em SuperPoint+NN e
+  SuperPoint+LightGlue, mas o t_det médio é 148,5 contra 85,6 ms (medianas 80,9 e 56,0 ms), com picos
+  de 3,4–4,6 s. Causa provável: a GPU reconfigura-se quando aparece um tamanho de imagem novo (o HPatches
+  tem tamanhos variados) e o SuperPoint+NN corre primeiro em cada par. A referir no relatório; o
+  código não foi alterado.
+- **Coerência com a literatura:** SuperPoint sem invariância à rotação (precisão 0 a partir de 60°,
+  DeTone et al. 2018 treinam com rotações pequenas); LightGlue quase duplica o recall com os mesmos
+  keypoints e descritores; FLANN mais lento que a força bruta com 2000 pontos (o índice é construído
+  em cada chamada); referência central a melhor (no proprio3, uma ponta como referência dá canvas de
+  36 Mpx).
+- **Relatório:** todas as tabelas do `relatorio.tex` geradas a partir dos CSV `final_*` (script, sem
+  transcrição manual); novas tabelas T4 (homografia) e da Parte 2.
+- **Repetida em 2026-10-16** (terminou às 00:58, 38 min) com o SuperPoint+SuperGlue (D42), com o mesmo comando
+  e a mesma tag: os CSV `final_*` e o relatório são desta corrida. Métricas dos clássicos e do
+  SuperPoint+NN/+LightGlue iguais às da corrida anterior; só os tempos mudaram (SuperPoint+NN: t_det
+  médio 164,7 ms, mediana 122 ms, contra 86 ms dos outros dois — a mesma anomalia).
+
+### D42 — SuperPoint+SuperGlue (2026-10-16)
+- **Estado:** Implementada (`learned.match_superglue`, método `SuperPoint+SuperGlue`, também no stitching).
+- **Porquê:** o enunciado refere o SuperGlue em §2.1, §2.6 (título "Light/SuperGlue" e comparação explícita:
+  o LightGlue teria "lower matching latency" que o SuperGlue) e §11. Não está na lista mínima do §4, mas
+  sem ele não se pode verificar a comparação do §2.6. Decisão da Carolina.
+- **Implementação:** Hugging Face `transformers` 5.18 (`SuperGlueForKeypointMatching`, pesos
+  `magic-leap-community/superglue_outdoor`, os originais da Magic Leap convertidos). Usa-se só o passo de
+  matching do modelo (`_match_image_pair`), com os keypoints, scores e descritores do mesmo SuperPoint
+  do SuperPoint+NN e do SuperPoint+LightGlue. O modelo completo correria o seu próprio SuperPoint numa
+  imagem redimensionada para 480×640, e a comparação deixava de isolar o matcher.
+  - **Normalização:** o SuperGlue normaliza cada imagem pelo seu tamanho (centro e 0,7 × lado maior);
+    a função do transformers só aceita um tamanho, por isso os pontos da imagem 2 são transformados
+    para que a normalização com o tamanho da imagem 1 dê o mesmo resultado. Pontos completados com
+    zeros e máscara quando as imagens têm números de pontos diferentes.
+- **Parâmetros:** `match_threshold` 0,2 e 100 iterações de Sinkhorn (valores do SuperGlue original; o
+  transformers usa 0,0 por omissão). Pesos "outdoor", os usados nas avaliações em HPatches.
+- **Teste (i_nescafe e v_graffiti):** recall 0,98 (i) e 0,88 (v), ao nível do LightGlue (0,95 e 0,88) e
+  muito acima do NN (0,65 e 0,20); tempo de matching mediano 309 ms contra 40 ms do LightGlue (GPU),
+  coerente com o §2.6 e com o artigo do LightGlue.
+- **Instalação:** `pip install transformers` no `cvc` em 2026-10-16 (5.18.0); OpenCV verificado depois
+  (4.13.0, `KAZE_create` presente). Acrescentado ao `requirements.txt`.
+
 ## Ambiente e repositório
 
 ### D13 — Ambiente Python
@@ -913,11 +989,8 @@ vista, escala e rotação; nenhuma estratégia aguenta rotações de 30°.
 - **P03** — HPatches completo ou subconjunto para SuperPoint/LightGlue em CPU (a GPU com CUDA
   parece disponível no `cvc`: torch cu126).
 - **P04** — Data de entrega, língua e limite de páginas do relatório.
-- **P05 (2026-10-08)** — **Métricas da homografia por implementar** em `evaluation.py`: inliers do
-  RANSAC, rácio de inliers, erro médio de reprojeção, corner error e % de pares com erro ≤ 1/3/5 px
-  (tabela T4). Dependem de `homography.estimate_homography` (Pessoa B), que ainda não existe. Quando
-  existir: chamá-la em `evaluate_pair`, acrescentar as colunas e a T4 no `summarize`, e registar os
-  limiares no config.
+- **P05 (2026-10-08)** — ~~Métricas da homografia por implementar em `evaluation.py`~~ Resolvido em
+  2026-10-15: tabela T4 implementada (D40).
 - **P06 (2026-10-08)** — **Pipelines aprendidos por registar** em `methods.py` (SuperPoint+NN,
   SuperPoint+LightGlue, SIFT+LightGlue): depende de `learned.py` (Pessoa B).
 - **P07 (2026-10-08, atualizado 2026-10-11)** — `main.py`: existem `--part1`, `--rotscale`,

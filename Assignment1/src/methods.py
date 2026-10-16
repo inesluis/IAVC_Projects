@@ -1,15 +1,15 @@
 # Lista dos métodos avaliados e as duas funções que os correm: extrair e emparelhar.
 
 from descriptors import BRIEF_OWN_NAMES, extract
-from learned import extract_sift_lg, extract_superpoint, match_lightglue
+from learned import extract_sift_lg, extract_superpoint, match_lightglue, match_superglue
 from matching import match_descriptors
 
 # As configurações clássicas mínimas do enunciado
 CLASSIC_METHODS = ["SIFT", "ORB", "KAZE", "FAST+BRIEF", "FAST+BRISK", "FAST+FREAK"]
 
 # Métodos aprendidos. Nos nomes "A+B", A é o extrator e B o matcher: NN é o matching de descritores
-# dos clássicos (ratio test + cross-check) e LightGlue é o matcher aprendido
-LEARNED_METHODS = ["SuperPoint+NN", "SuperPoint+LightGlue", "SIFT+LightGlue"]
+# dos clássicos (ratio test + cross-check); SuperGlue e LightGlue são matchers aprendidos
+LEARNED_METHODS = ["SuperPoint+NN", "SuperPoint+SuperGlue", "SuperPoint+LightGlue", "SIFT+LightGlue"]
 
 ALL_METHODS = CLASSIC_METHODS + LEARNED_METHODS
 
@@ -28,4 +28,6 @@ def match_features(method: str, f1, f2, cfg: dict):
     # Emparelha as features de duas imagens. Devolve (matches, tempo em ms)
     if method.endswith("LightGlue"):
         return match_lightglue(f1, f2, cfg)
+    if method.endswith("SuperGlue"):
+        return match_superglue(f1, f2, cfg)
     return match_descriptors(f1, f2, cfg)

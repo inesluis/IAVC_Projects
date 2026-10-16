@@ -1,4 +1,4 @@
-"""Força bruta vs vizinho mais próximo aproximado (FLANN) no stitching (§3.1, passo 4; P12).
+"""Força bruta vs vizinho mais próximo aproximado (FLANN) no stitching  
 
 Com os mesmos keypoints e descritores, muda-se só a pesquisa de vizinhos; o ratio test, o cross-check
 e o RANSAC são os mesmos. Regista-se o tempo de matching, os matches, os inliers e se a homografia
@@ -7,32 +7,27 @@ e o RANSAC são os mesmos. Regista-se o tempo de matching, os matches, os inlier
   results/panoramas/matcher/<conjunto>_<método>_<bf|flann>.jpg
 """
 
-from pathlib import Path
-
+from pathlib import Path 
 import numpy as np
-import pandas as pd
-
+import pandas as pd 
 from datasets import imwrite
-from homography import project_points
+from homography import corner_distance
 from matching import match_descriptors
 from methods import extract_features
-from stitching import estimate_adjacent, image_corners, load_panorama_images
+from stitching import estimate_adjacent, load_panorama_images, stitch_or_none
 from studies.curves import comma
 from studies.qualitative import file_name
-from studies.ransac_study import stitch_or_none
 from studies.stitching_study import ransac_text
 from visualization import plot_image_grid, save_figure
 
 MATCHERS = {"bf": "força bruta", "flann": "FLANN"}
-
-
+ 
 def timed_matches(f1, f2, cfg: dict, matcher: str, repeats: int):
-    """Matches de um par e mediana do tempo de matching (ms) em várias medições, após um aquecimento."""
+    # Matches de um par e mediana do tempo de matching (ms) em várias medições, após um aquecimento 
     match_descriptors(f1, f2, cfg, matcher)
     runs = [match_descriptors(f1, f2, cfg, matcher) for _ in range(repeats)]
     return runs[0][0], float(np.median([t for _, t in runs]))
-
-
+ 
 def run_matcher_study(cfg: dict):
     """Corre BF e FLANN nos métodos de cfg["stitching"]["matcher_study"] (só métodos com descritores:
     o LightGlue não faz pesquisa de vizinhos). Devolve (tabela, legendas).
@@ -67,11 +62,7 @@ def run_matcher_study(cfg: dict):
                     bf_set = {(m.queryIdx, m.trainIdx) for m in bf_matches[i]}
                     shared = (np.mean([(m.queryIdx, m.trainIdx) in bf_set for m in matches[i]])
                               if matches[i] else np.nan)
-                    diff = np.nan
-                    if pair["H"] is not None and bf_pairs[i]["H"] is not None:
-                        corners = image_corners(images[i])
-                        diff = np.linalg.norm(project_points(corners, pair["H"])
-                                              - project_points(corners, bf_pairs[i]["H"]), axis=1).mean()
+                    diff = corner_distance(pair["H"], bf_pairs[i]["H"], images[i])
                     rows.append({"set": set_name, "method": method, "matcher": matcher, "pair": f"{i + 1}->{i + 2}",
                                  "t_match_ms": times[i], "N_matches": pair["N_matches"],
                                  "N_inliers": pair["N_inliers"], "inlier_ratio": pair["inlier_ratio"],

@@ -12,29 +12,18 @@ Referência: com as mesmas homografias adjacentes, muda-se só a imagem de refer
 """
 
 import copy
-from pathlib import Path
-
+from pathlib import Path 
 import numpy as np
-import pandas as pd
-
+import pandas as pd 
 from datasets import imwrite
-from homography import chain_to_reference, project_points
+from homography import chain_to_reference, corner_distance, image_corners, project_points
 from methods import extract_features
-from stitching import (compute_canvas, estimate_adjacent, image_corners, load_panorama_images, match_adjacent,
-                       stitch_images)
+from stitching import (compute_canvas, estimate_adjacent, load_panorama_images, match_adjacent, stitch_images,
+                       stitch_or_none)
 from studies.curves import comma, method_styles
 from studies.stitching_study import matching_text, ransac_text
 from visualization import plot_curves, plot_image_grid, save_figure
 
-
-def stitch_or_none(images, pairs, ref: int):
-    """Panorama com a referência dada, ou None se faltar uma homografia ou o canvas for absurdo."""
-    if any(pair["H"] is None for pair in pairs):
-        return None
-    try:
-        return stitch_images(images, chain_to_reference([pair["H"] for pair in pairs], ref))
-    except ValueError:
-        return None
 
 def run_threshold_study(methods, cfg: dict):
     """Varia o limiar do RANSAC num conjunto de imagens fixo. Devolve (tabela, legendas).
@@ -60,11 +49,7 @@ def run_threshold_study(methods, cfg: dict):
             cfg_thr["ransac"]["thr_px"] = thr
             pairs = estimate_adjacent(features, matches, cfg_thr)
             for i, (pair, base) in enumerate(zip(pairs, baseline)):
-                shift = np.nan
-                if pair["H"] is not None and base["H"] is not None:
-                    corners = image_corners(images[i])
-                    shift = np.linalg.norm(project_points(corners, pair["H"])
-                                           - project_points(corners, base["H"]), axis=1).mean()
+                shift = corner_distance(pair["H"], base["H"], images[i])
                 rows.append({"set": set_name, "method": method, "pair": f"{i + 1}->{i + 2}", "thr_px": thr,
                              "N_matches": pair["N_matches"], "N_inliers": pair["N_inliers"],
                              "inlier_ratio": pair["inlier_ratio"], "reproj_err_px": pair["reproj_err_px"],
@@ -111,11 +96,10 @@ def run_threshold_study(methods, cfg: dict):
     return df, captions
 
 def polygon_area(points: np.ndarray) -> float:
-    """Área de um polígono dado pelos vértices (N, 2), pela fórmula do atacador."""
+    # Área de um polígono dado pelos vértices (N, 2), pela fórmula do atacador 
     x, y = points[:, 0], points[:, 1]
     return 0.5 * abs(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
-
-
+ 
 def run_reference_study(cfg: dict):
     """Compara todas as escolhas de imagem de referência em cada conjunto. Devolve (tabela, legendas).
 

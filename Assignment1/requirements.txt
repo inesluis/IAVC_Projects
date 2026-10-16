@@ -8,6 +8,7 @@ pandas
 psutil
 torch
 torchvision
+transformers   # SuperGlue (pesos magic-leap-community/superglue_outdoor, descarregados no 1.º uso)
 
 # For LightGlue, install the latest version from GitHub:
 git+https://github.com/cvg/LightGlue.git

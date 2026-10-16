@@ -1,16 +1,12 @@
-"""Matching de descritores: ratio test de Lowe + cross-check.  [Pessoa A]"""
+# Matching de descritores: ratio test de Lowe + cross-check 
 
 import time
-
 import cv2
 import numpy as np
-
 from interface import Features
 
-# índices do FLANN (constantes da biblioteca; o OpenCV não as exporta em Python)
 FLANN_INDEX_KDTREE = 1
 FLANN_INDEX_LSH = 6
-
 
 def make_matcher(norm: int, kind: str, cfg: dict):
     """Pesquisa de vizinhos: "bf" (força bruta, exata) ou "flann" (vizinho aproximado).
@@ -28,15 +24,14 @@ def make_matcher(norm: int, kind: str, cfg: dict):
                  "key_size": flann["lsh_key_size"], "multi_probe_level": flann["lsh_multi_probe"]}
     return cv2.FlannBasedMatcher(index, {"checks": flann["checks"]})
 
-
 def match_descriptors(f1: Features, f2: Features, cfg: dict, matcher: str = "bf"):
-    """Emparelha os descritores da imagem 1 com os da imagem 2. Devolve (matches, tempo em ms).
-
-    Um match é aceite se passar os dois filtros (protocolo do enunciado, §2.8):
+    # Emparelha os descritores da imagem 1 com os da imagem 2. Devolve (matches, tempo em ms).
+    """
+    Um match é aceite se passar os dois filtros:
       1. ratio test: a distância ao melhor vizinho é menor que ratio x a distância ao segundo;
       2. cross-check: o melhor vizinho da imagem 2 para a imagem 1 é o mesmo ponto.
     O resultado é 1-para-1. Em cada cv2.DMatch, queryIdx é o índice na imagem 1 e trainIdx na imagem 2.
-    matcher="flann" só muda a pesquisa de vizinhos (estudo força bruta vs aproximado, P12); os filtros
+    matcher="flann" só muda a pesquisa de vizinhos (estudo força bruta vs aproximado); os filtros
     são os mesmos. Nas experiências usa-se sempre a força bruta.
     """
     if f1.desc is None or f2.desc is None:
@@ -61,9 +56,8 @@ def match_descriptors(f1: Features, f2: Features, cfg: dict, matcher: str = "bf"
     t_match = (time.perf_counter() - t0) * 1000
     return matches, t_match
 
-
 def matched_points(f1: Features, f2: Features, matches):
-    """Coordenadas dos pontos emparelhados: dois arrays (M, 2), um por imagem."""
+    # Coordenadas dos pontos emparelhados: dois arrays (M, 2), um por imagem 
     p1 = np.array([f1.kps[m.queryIdx].pt for m in matches], dtype=np.float64).reshape(-1, 2)
     p2 = np.array([f2.kps[m.trainIdx].pt for m in matches], dtype=np.float64).reshape(-1, 2)
     return p1, p2

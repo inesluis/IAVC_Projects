@@ -1,27 +1,23 @@
-"""Descritores (SIFT, ORB, KAZE, BRIEF, BRISK, FREAK, BRIEF próprio) e extração completa.  [Pessoa A]"""
+# Descritores (SIFT, ORB, KAZE, BRIEF, BRISK, FREAK, BRIEF próprio) e extração completa 
 
 import time
-
 import cv2
 import numpy as np
-
 from brief_own import STRATEGIES, compute_brief, make_pairs
 from detectors import create_detector, detect
 from interface import Features
 
-# Distância usada no matching: L2 nos descritores float, Hamming nos binários (enunciado §2.5)
+# Distância usada no matching: L2 nos descritores float, Hamming nos binários  
 FLOAT_DESCRIPTORS = ["SIFT", "KAZE"]
 
 # Nomes dos descritores BRIEF próprios: "BRIEF-GI", "BRIEF-GII", "BRIEF-GIII", "BRIEF-GV"
 BRIEF_OWN_NAMES = ["BRIEF-" + s for s in STRATEGIES]
 
-
 def descriptor_norm(name: str) -> int:
     return cv2.NORM_L2 if name in FLOAT_DESCRIPTORS else cv2.NORM_HAMMING
 
-
 def create_descriptor(name: str, cfg: dict):
-    """Cria o descritor do OpenCV com os parâmetros do config."""
+    # Cria o descritor do OpenCV  
     if name in ("SIFT", "ORB", "KAZE"):
         return create_detector(name, cfg)   # nestes métodos o mesmo objeto deteta e descreve
     params = cfg["descriptors"][name]
@@ -33,14 +29,11 @@ def create_descriptor(name: str, cfg: dict):
         return cv2.xfeatures2d.FREAK_create(**params)
     raise ValueError(f"Descritor desconhecido: {name}")
 
-
 def describe(name: str, gray, kps, cfg: dict):
-    """Calcula os descritores dos keypoints. Devolve (keypoints, descritores, tempo em ms).
-
-    Atenção: os descritores removem keypoints (por exemplo, junto à borda), por isso a lista
-    devolvida pode ser mais curta e é essa que tem de ser usada. O tempo não inclui a preparação
-    (criar o objeto do OpenCV ou gerar os pares do BRIEF próprio), tal como na deteção (D06).
-    """
+    # Calcula os descritores dos keypoints. Devolve (keypoints, descritores, tempo em ms).
+    # Nota: os descritores removem keypoints (por exemplo, junto à borda), por isso a lista
+    # devolvida pode ser mais curta e é essa que tem de ser usada.  
+     
     if name in BRIEF_OWN_NAMES:
         pairs = make_pairs(name.removeprefix("BRIEF-"), cfg)
         t0 = time.perf_counter()
@@ -58,22 +51,20 @@ def describe(name: str, gray, kps, cfg: dict):
         desc = desc.astype(np.float32, copy=False)
     return kps, desc, t_desc
 
-
 def split_method(method: str):
-    """"FAST+BRIEF" -> ("FAST", "BRIEF"); "SIFT" -> ("SIFT", "SIFT")."""
+    # FAST+BRIEF" -> ("FAST", "BRIEF"); "SIFT" -> ("SIFT", "SIFT") 
     if "+" in method:
         detector, descriptor = method.split("+")
     else:
         detector = descriptor = method
-    # SIFT, ORB e KAZE dependem da escala/octava do seu próprio detetor (D11)
+    # SIFT, ORB e KAZE dependem da escala do seu próprio detetor  
     if descriptor in ("SIFT", "ORB", "KAZE") and descriptor != detector:
         raise ValueError(f"O descritor {descriptor} só funciona com o detetor {descriptor}")
     return detector, descriptor
 
-
 def extract(method: str, gray, cfg: dict) -> Features:
-    """Deteta e descreve com um método, por exemplo "SIFT" ou "FAST+FREAK".
-    A deteção e a descrição são feitas em separado para medir os dois tempos (D06)."""
+    # Deteta e descreve com um método, por exemplo "SIFT" ou "FAST+FREAK" 
+    # A deteção e a descrição são feitas em separado para medir os dois tempos  
     detector, descriptor = split_method(method)
     kps, t_det = detect(detector, gray, cfg)
     n_detected = len(kps)

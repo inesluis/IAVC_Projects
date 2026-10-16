@@ -1,19 +1,16 @@
-"""Teste sintético de robustez à rotação e à escala (categorias "rot" e "scale").  [Pessoa A]
+# Teste sintético (robustez à rotação-rot e à escala-scale)  
 
+"""
 A imagem base (GRAF imagem 1) é rodada ou escalada com uma transformação conhecida, que passa a
-ser a homografia ground-truth. Assim avalia-se cada fator isolado; no HPatches as sequências de
-ponto de vista misturam perspetiva, rotação e escala. Ver DECISOES.md, D20.
+ser a homografia ground-truth
 """
 
 import cv2
 import numpy as np
-
 from datasets import ImagePair, load_image
 
-
 def circular_mask(gray, feather_px: float, fill: int):
-    """Fica só com o círculo inscrito na imagem, com passagem suave para o cinzento `fill`.
-    Assim a rotação não cria nem perde conteúdo, e a borda do círculo quase não gera keypoints."""
+    # Fica só com o círculo inscrito na imagem, com passagem suave para o cinzento `fill` 
     h, w = gray.shape
     yy, xx = np.mgrid[0:h, 0:w]
     dist = np.hypot(xx - (w - 1) / 2, yy - (h - 1) / 2)
@@ -23,20 +20,19 @@ def circular_mask(gray, feather_px: float, fill: int):
 
 
 def rotate(gray, angle_deg: float, fill: int):
-    """Roda a imagem em torno do centro. Devolve (imagem, homografia 3x3)."""
+    # Roda a imagem em torno do centro. Devolve (imagem, homografia 3x3) 
     h, w = gray.shape
     M = cv2.getRotationMatrix2D(((w - 1) / 2, (h - 1) / 2), angle_deg, 1.0)
     rotated = cv2.warpAffine(gray, M, (w, h), flags=cv2.INTER_LINEAR,
                              borderMode=cv2.BORDER_CONSTANT, borderValue=fill)
     return rotated, np.vstack([M, [0, 0, 1]])
 
-
 def scale(gray, s: float, fill: int):
     """Escala a imagem em torno do centro, mantendo o tamanho da tela. Devolve (imagem, homografia).
     s > 1: amplia e recorta; s < 1: reduz e preenche a margem com o cinzento `fill`."""
     h, w = gray.shape
     new_w, new_h = round(w * s), round(h * s)
-    # INTER_AREA ao reduzir evita aliasing; INTER_LINEAR ao ampliar
+    # INTER_AREA ao reduzir evita aliasing | INTER_LINEAR ao ampliar
     resized = cv2.resize(gray, (new_w, new_h), interpolation=cv2.INTER_AREA if s < 1 else cv2.INTER_LINEAR)
 
     # colar a imagem redimensionada centrada na tela (o canto pode ficar fora, se s > 1)
@@ -53,10 +49,8 @@ def scale(gray, s: float, fill: int):
                   [0, 0, 1]])
     return canvas, H
 
-
 def make_pairs(cfg: dict) -> list[ImagePair]:
-    """Pares sintéticos: primeiro os de rotação, depois os de escala. 0 graus e escala 1 são
-    controlos (resultado trivial), marcados para ficarem fora das médias."""
+    # Pares sintéticos: primeiro os de rotação, depois os de escala "
     params = cfg["synthetic"]
     _, gray = load_image(params["base_image"])
     fill = int(round(gray.mean()))   # o mesmo cinzento de fundo em todas as operações

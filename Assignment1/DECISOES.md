@@ -850,361 +850,107 @@ vista, escala e rotação; nenhuma estratégia aguenta rotações de 30°.
   de ±50%. **Para a corrida oficial (P10):** máquina ligada à corrente e sem outros programas, e
   repetir as experiências sensíveis ao tempo (`--part1`, `--fast`) em separado, com a máquina fria.
 
-## Parte da Pessoa B: métodos aprendidos, homografia e stitching
+### D29 — Estrutura do relatório (2026-10-13)
+- **Estado:** Esqueleto criado (`report/relatorio.tex`, ficheiro único, para o Overleaf com pdfLaTeX).
+  Não foi compilado localmente (não há LaTeX instalado nesta máquina); passou verificações estáticas
+  (chavetas, ambientes, citações, referências, nº de colunas das tabelas, caracteres).
+- **O que o enunciado pede (§8, §9):** introdução (0,75–1 p.); descrição dos detetores, descritores e
+  matchers (3–5 p.: ideia, vantagens, desvantagens, custo; sem reproduzir detalhes de implementação dos
+  artigos); setup e resultados com discussão (2–5 p.); conclusão (0,75–1 p.); referências. Não pede
+  explicação de código. Pede explicitamente a explicação do RANSAC (§3.2) e da composição de
+  homografias (§3.3).
+- **Decisões:** relatório em português; sem preocupação com o limite de páginas sugerido (decisão da
+  Carolina); capa própria com logótipo opcional (`uc_logo.png`).
+- **Estrutura:** 1 Introdução · 2 Métodos (clássicos; BRIEF implementado; aprendidos; emparelhamento,
+  RANSAC e homografia) · 3 Setup (dados; protocolo e métricas; ambiente) · 4 Resultados da Parte 1
+  (deteção e FAST; emparelhamento i/v; rotação e escala; qualitativa; BRIEF; homografia; custo e
+  compromisso) · 5 Resultados da Parte 2 (stitching) · 6 Conclusão · Referências · Anexos (resultados
+  complementares; uso de ferramentas de IA).
+- **Já preenchido:** capa, índice, 7 tabelas com os resultados da D28 (geradas a partir dos CSV por
+  par, para evitar erros de transcrição e de duplo arredondamento), 6 figuras, a secção de setup em
+  rascunho factual e 16 referências. O texto das restantes secções está indicado em caixas "Por
+  escrever", com quem escreve e os pontos a discutir; escondem-se todas com
+  `\renewcommand{\nota}[1]{}`.
+- **Figuras no Overleaf:** carregar a pasta `results/figures` com o nome `figuras`. Uma figura em falta
+  aparece como uma caixa com o nome do ficheiro, sem erro de compilação.
+- **A atualizar depois da corrida oficial:** todas as tabelas e figuras (faltam os métodos aprendidos e
+  a tabela da homografia).
 
-Entradas D29–D38, escritas em 2026-10-14 sobre o código do commit `4615590` (ramo `Ines`,
-2026-10-13). As verificações destas entradas estão no VERIFICACOES.md, secção 3.
+### D40 — Métricas da homografia na Parte 1: tabela T4 (2026-10-15)
+- **Estado:** Implementada (resolve P05). Número D40 para não colidir com as D30–D39 da Inês.
+- **O que o enunciado pede (§2.7):** "homography estimation accuracy", "number of RANSAC inliers" e
+  "average reprojection/residual error of inliers", por método e por categoria.
+- **Implementação:** em `evaluation.evaluate_pair`, a homografia é estimada com
+  `homography.estimate_homography` (Pessoa B) sobre os matches putativos, com os parâmetros de
+  `cfg["ransac"]` (limiar 3 px, 2000 iterações, confiança 0,995, seed fixa). Colunas novas por par:
+  `H_found`, `N_inliers`, `inlier_ratio` (= N_inliers / N_putative), `reproj_err_px` (erro médio dos
+  inliers) e `corner_err_px`. A tabela `T4_homography` (em `summarize`) tem as médias por método e
+  categoria, a fração de pares com homografia, a mediana do corner error e `acc_1px`, `acc_3px`,
+  `acc_5px`. Também nas tabelas do GRAF (`graf_pairs.csv`).
+- **Exatidão da homografia = corner error:** distância média entre os 4 cantos da imagem 1
+  projetados com a H estimada e com a H ground-truth. O enunciado não define a medida; esta é a do
+  guia e a usada no HPatches/SuperPoint (homography estimation accuracy com limiares de 1, 3 e 5 px).
+  Mede o efeito da H na imagem toda, e não só nos pontos usados para a estimar.
+- **Escolhas próprias:**
+  - **Limiar do RANSAC = 3 px:** igual ao critério de correção de um match (`eps_px`), para que
+    "inlier" e "correto" usem a mesma tolerância.
+  - **Mediana do corner error, não média:** uma homografia muito errada dá erros de milhares de px e
+    dominaria a média. Os `acc_<t>px` dão a distribuição.
+  - **Par sem homografia** (menos de 4 matches ou falha do RANSAC): `N_inliers = 0`, erros a `nan`, e
+    conta como falhado nos `acc_<t>px`.
+  - Limiares 1/3/5 px em `cfg["eval"]["corner_thr_px"]`.
+- **Teste (i_nescafe e v_graffiti, SIFT e ORB):** nos pares de iluminação, N_inliers ≈ N_correct e
+  corner error mediano < 0,5 px (acc_3px = 1); no ponto de vista, o erro é maior (SIFT 4,3 px,
+  ORB 12,5 px), como esperado. Os ficheiros do teste foram apagados.
 
-### D29 — Métodos aprendidos: implementação, pesos e interface
-- **Estado:** Implementada (`src/learned.py`, ramos em `methods.py`, campo `Features.raw` em
-  `interface.py`)
-- **Implementação:** pacote cvg/LightGlue (Lindenberger, Sarlin e Pollefeys, ICCV 2023), instalado a
-  partir do GitHub (`requirements.txt`; o pacote declara a versão 0.0). Inclui o SuperPoint, um SIFT
-  próprio e o matcher LightGlue. **Não se treina nada** (enunciado §2.6).
-- **Pesos pré-treinados** (descarregados pelo pacote na primeira utilização para
-  `~/.cache/torch/hub/checkpoints/`; fora da entrega, D15):
+### D41 — Corrida final (2026-10-15)
+- **Comando:** `python -u main.py --part1 --rotscale --robustness --graf --qualitative --fast --brief
+  --curves --part2 --tag final`, no env `cvc`; log em `results/tables/final_run.log`. Clássicos no CPU
+  (i7-12650H), aprendidos na GPU (RTX 3050 Ti Laptop, torch 2.14.1+cu126).
+- **Cobertura:** 9 métodos × 580 pares do HPatches (285 i, 295 v) e × 23 pares sintéticos; GRAF;
+  stitching em 4 conjuntos (keble, proprio1–3) com 5 configurações; estudos do RANSAC, da referência e
+  BF vs FLANN.
+- **Verificações:** as métricas dos 6 clássicos são iguais às da corrida de 12 de outubro em 100 % dos
+  pares (código determinístico), e as do FAST (T6) e do BRIEF (T7) também. Os tempos dos clássicos
+  subiram cerca de 20 % no `--part1` e desceram no `--fast`: variação da máquina, não do código.
+- **Anomalia dos tempos na GPU:** o extrator do SuperPoint é o mesmo em SuperPoint+NN e
+  SuperPoint+LightGlue, mas o t_det médio é 148,5 contra 85,6 ms (medianas 80,9 e 56,0 ms), com picos
+  de 3,4–4,6 s. Causa provável: a GPU reconfigura-se quando aparece um tamanho de imagem novo (o HPatches
+  tem tamanhos variados) e o SuperPoint+NN corre primeiro em cada par. A referir no relatório; o
+  código não foi alterado.
+- **Coerência com a literatura:** SuperPoint sem invariância à rotação (precisão 0 a partir de 60°,
+  DeTone et al. 2018 treinam com rotações pequenas); LightGlue quase duplica o recall com os mesmos
+  keypoints e descritores; FLANN mais lento que a força bruta com 2000 pontos (o índice é construído
+  em cada chamada); referência central a melhor (no proprio3, uma ponta como referência dá canvas de
+  36 Mpx).
+- **Relatório:** todas as tabelas do `relatorio.tex` geradas a partir dos CSV `final_*` (script, sem
+  transcrição manual); novas tabelas T4 (homografia) e da Parte 2.
+- **Repetida em 2026-10-16** (terminou às 00:58, 38 min) com o SuperPoint+SuperGlue (D42), com o mesmo comando
+  e a mesma tag: os CSV `final_*` e o relatório são desta corrida. Métricas dos clássicos e do
+  SuperPoint+NN/+LightGlue iguais às da corrida anterior; só os tempos mudaram (SuperPoint+NN: t_det
+  médio 164,7 ms, mediana 122 ms, contra 86 ms dos outros dois — a mesma anomalia).
 
-  | Modelo | Ficheiro | Papel |
-  |---|---|---|
-  | SuperPoint | `superpoint_v1.pth` (Magic Leap) | detetor + descritor |
-  | LightGlue para SuperPoint | `superpoint_lightglue_v0-1_arxiv.pth` | matcher |
-  | LightGlue para SIFT | `sift_lightglue_v0-1_arxiv.pth` | matcher |
-
-- **Configurações** (nomes "extrator+matcher"; `methods.LEARNED_METHODS`):
-
-  | Nome | Extrator | Descritor | Matcher |
-  |---|---|---|---|
-  | `SuperPoint+NN` | SuperPoint | 256 floats, L2 | ratio test 0,8 + cross-check (D16) |
-  | `SuperPoint+LightGlue` | SuperPoint | 256 floats | LightGlue (pesos SuperPoint) |
-  | `SIFT+LightGlue` | SIFT do pacote (RootSIFT) | 128 floats | LightGlue (pesos SIFT) |
-
-  As duas primeiras partilham o extrator, por isso a diferença entre elas mede só o matcher, como
-  pede o enunciado (§2.6: "keep detector/descriptor performance conceptually separate from matcher
-  performance"). Verificado no teste da D37: as duas têm o mesmo nº médio de keypoints e de
-  correspondências ground-truth em `i` e em `v`.
-- **Interface (D01):** devolvem `Features` como os clássicos. `kps` são `cv2.KeyPoint(x, y, 1)`, só com
-  a posição; `desc` é `float32 (N, D)` com `NORM_L2`; `method` é "SuperPoint" ou "SIFT-LG" e diz ao
-  matcher que pesos usar; `raw` guarda o dicionário de tensores do extrator, que o LightGlue recebe
-  (a avaliação não o usa).
-- **Tempos (D06):** a rede deteta e descreve numa só passagem, por isso **`t_det` = tempo total da
-  extração e `t_desc = 0`**. Em GPU chama-se `torch.cuda.synchronize()` antes e depois de cada medição
-  (as operações são assíncronas). O aquecimento da avaliação (`evaluation.warm_up`) apanha o
-  carregamento dos pesos e a inicialização da CUDA. Os modelos ficam em memória entre imagens.
-- **Casos limite:** o SIFT do pacote lança `ValueError` quando não encontra nenhum ponto; nesse caso
-  devolve-se `Features` vazio. Com uma das imagens vazia, o LightGlue devolve 0 matches.
-- **No relatório:** SuperPoint é detetor + descritor; LightGlue (e SuperGlue) são matchers, não
-  detetores (§4). Indicar a implementação e os pesos (§7, §11).
-
-### D30 — Parâmetros dos métodos aprendidos
-- **Estado:** Implementada (`CFG["learned"]`, `CFG["max_keypoints"]`)
-- **Regra:** valores por omissão do pacote, como nos detetores do OpenCV (D09). A única alteração é o
-  limite comum de 2000 pontos (D05).
-- **Resolução:** a original (`resize = None`), como nos clássicos. Responde ao ponto 4.1 do
-  PONTO_DE_SITUACAO. Verificado: com `resize` ligado, os keypoints voltam às coordenadas da imagem
-  original (VERIFICACOES 3.3).
-- **Limite:** `max_num_keypoints = 2000`. É um teto: o SuperPoint deteta menos em várias imagens (ex.:
-  907 na GRAF imagem 1; ~1400 no `keble`).
-- **Valores usados** (lidos de `default_conf` no pacote instalado, 2026-10-14):
-
-  | Modelo | Parâmetros |
-  |---|---|
-  | SuperPoint | `descriptor_dim` 256, `nms_radius` 4, `detection_threshold` 0,0005, `remove_borders` 4 |
-  | SIFT do pacote | `rootsift` True, `backend` "opencv", `detection_threshold` 0,0066667, `edge_threshold` 10, `first_octave` −1, `num_octaves` 4, `nms_radius` 0; `max_num_keypoints` 4096 → 2000 |
-  | LightGlue | `filter_threshold` 0,1, `depth_confidence` 0,95, `width_confidence` 0,99, `n_layers` 9, `flash` True |
-
-  O SIFT do pacote **não** tem os mesmos parâmetros do `cv2.SIFT` da configuração clássica (ex.:
-  `first_octave = −1` e descritor RootSIFT). Por isso "SIFT" e "SIFT+LightGlue" diferem no extrator e
-  no matcher, e não só no matcher.
-- **`depth_confidence` e `width_confidence`:** são a paragem antecipada e o descarte de pontos do
-  LightGlue (enunciado §2.6: "early stopping and adaptive point pruning"). Ficam ligados, como no
-  pacote.
-- **Dispositivo:** `CFG["learned"]["device"] = None` usa a GPU se existir. Os tempos dependem disto e
-  têm de vir sempre com a máquina indicada (D38).
-
-### D31 — Matching dos métodos aprendidos e critério de match putativo
-- **Estado:** Implementada (`methods.match_features`, `learned.match_lightglue`)
-- **SuperPoint+NN:** o mesmo `match_descriptors` dos clássicos (força bruta, L2, ratio 0,8 +
-  cross-check). Assim o protocolo é igual para todos os métodos baseados em descritores (§2.8).
-  - Alternativa: só vizinho mútuo, sem ratio (sugestão do guia, §13). Rejeitada para manter um único
-    protocolo; a função `mutual_nn` foi retirada na D27.
-  - A ter em conta na discussão: no teste da D37 o SuperPoint+NN fica com menos de metade dos matches
-    do SuperPoint+LightGlue (PMR 0,20 contra 0,53 em `i`), com precisão semelhante em `i`.
-- **LightGlue:** **não há ratio test.** Um match putativo é um par que o LightGlue aceita com
-  confiança ≥ `filter_threshold` = 0,1. Os pares são 1-para-1 por construção (verificado,
-  VERIFICACOES 3.3). Em cada `cv2.DMatch`, `queryIdx` é o índice na imagem 1, `trainIdx` na imagem 2, e
-  `distance = 1 − confiança`, para "menor é melhor" continuar válido.
-- **No relatório (§2.8 pede o limiar de matching usado):** "ratio 0,8 + cross-check nos métodos com
-  matching de descritores (clássicos e SuperPoint+NN); confiança mínima 0,1 nos métodos com LightGlue".
-
-### D32 — Homografia com RANSAC (`homography.estimate_homography`)
-- **Estado:** Implementada (`src/homography.py`). Usada no stitching; na Parte 1 falta a T4 (P05).
-- **Decisão:** `cv2.findHomography(p1, p2, cv2.RANSAC, ransacReprojThreshold=3, maxIters=2000,
-  confidence=0,995)` (`CFG["ransac"]`), a partir de correspondências de pontos (§3.1, passo 6; não
-  template matching).
-- **Contrato (o pedido no PONTO_DE_SITUACAO, 3.1):** devolve `(H, inliers, erro)`: H 3×3 que leva a
-  imagem 1 para a imagem 2 (a convenção da ground-truth do HPatches), máscara booleana dos inliers e
-  erro médio de reprojeção ‖H·p1 − p2‖ **só dos inliers**, em píxeis (§3.1, passo 7). Com menos de 4
-  matches, ou se o OpenCV não devolver H: `(None, None, nan)`.
-- **Mínimo de 4 matches:** H tem 8 graus de liberdade e cada correspondência dá 2 equações (§3.2).
-- **Seed em cada chamada:** `cv2.setRNGSeed(cfg["seed"])` antes de cada estimação. O RANSAC é aleatório
-  e, sem isto, o resultado de uma chamada dependeria das chamadas feitas antes. Verificado: a mesma
-  entrada dá a mesma H e a mesma máscara (VERIFICACOES 3.1).
-- **Princípio do RANSAC (o relatório tem de o explicar, §3.2):**
-  1. escolhe ao acaso 4 matches e calcula uma H candidata;
-  2. conta os matches com erro de reprojeção abaixo do limiar (os inliers da candidata);
-  3. repete e guarda a H com mais inliers;
-  4. recalcula H com todos os inliers da melhor hipótese.
-
-  O limiar decide o que é inlier: pequeno demais rejeita matches certos com ruído de localização;
-  grande demais aceita matches errados e a H fica pior (estudo na D35). A confiança e o nº máximo de
-  iterações controlam quando o OpenCV pára de sortear.
-- **Porquê 3 px:** é o mesmo valor do critério de correção da Parte 1 (§2.8) e é o menor limiar em que
-  todos os métodos do stitching ficam com rácio de inliers ≥ 0,85 (D35).
-- **Composição (`chain_to_reference`, §3.3):** com homografias só entre imagens adjacentes
-  (`adjacent[i]`: imagem i → i+1), cada imagem chega à referência pelo produto das homografias no
-  caminho: diretas à esquerda da referência, inversas à direita. Com A, B, C e referência A,
-  C → A = inv(H_AB) · inv(H_BC). Cada produto junta o erro de mais uma estimação, por isso as imagens
-  mais afastadas da referência acumulam mais erro (estudo na D36).
-
-### D33 — Pipeline de stitching
-- **Estado:** Implementada (`src/stitching.py`, `studies/stitching_study.py`, `main.py --part2`)
-- **Os 12 passos do enunciado (§3.1) no código:**
-
-  | Passo | Onde |
-  |---|---|
-  | 1. Ler a cores e em cinzento | `stitching.load_panorama_images` (cinzento só para detetar; o panorama é a cores) |
-  | 2–3. Detetar e descrever | `methods.extract_features` |
-  | 4–5. Matching e filtro | `methods.match_features` (ratio 0,8 + cross-check, ou LightGlue; D31) |
-  | 6–7. Homografia RANSAC; matches, inliers, rácio, erro | `stitching.estimate_adjacent` → `homography.estimate_homography` |
-  | 8. Visualizar keypoints e inliers | `studies/stitching_study.py` (`plot_keypoints`, `plot_matches` com a máscara de inliers) |
-  | 9. Warp | `stitching.warp_to_canvas` (`cv2.warpPerspective` com `T @ H`) |
-  | 10. Canvas | `stitching.compute_canvas` |
-  | 11. Composição (média na sobreposição) | `stitching.blend_average` |
-  | 12. Várias imagens; referências diferentes | `homography.chain_to_reference`; estudo na D36 |
-
-- **Não se usa o `cv2.Stitcher`** (enunciado §11).
-- **Redução das fotografias:** as imagens com o lado maior acima de `CFG["stitching"]["max_side"]` =
-  1000 px são reduzidas com `INTER_AREA`. As nossas fotografias (3024×4032) passam a 750×1000; as
-  `keble` (720×568) ficam iguais. Motivo: um canvas a partir de fotos de 12 Mpx não cabe na memória.
-- **Canvas:** projetam-se os 4 cantos de cada imagem com a sua H e fica o retângulo que os contém. Uma
-  translação T leva as coordenadas negativas para dentro do canvas. Se um lado passar de 20 000 px,
-  lança-se um erro: é sinal de uma homografia errada que esgotaria a memória.
-- **Máscaras:** obtidas deformando uma imagem só com 1s, e não testando "píxel > 0", para os píxeis
-  pretos da própria imagem não serem tratados como vazios (verificado, VERIFICACOES 3.2).
-- **Composição:** em cada píxel, soma das imagens ÷ soma das máscaras = média das imagens que lá existem
-  (baseline do §3.4). Não foi implementado blending melhorado (feathering, multibanda): é crédito extra
-  opcional.
-- **Conjuntos de imagens** (`CFG["stitching"]["sets"]`, da esquerda para a direita por ordem de nome):
-  - `keble`: 3 imagens 720×568, material da cadeira (`data/Panorama/`);
-  - `proprio`: 3 fotografias nossas, 3024×4032 na vertical (`data/panorama2/`);
-  - `data/vehicle-seqs/` não é usado.
-- **Configurações comparadas:** SIFT (float, L2), ORB (binário, Hamming), KAZE (float, espaço de escalas
-  não linear), SuperPoint+NN e SuperPoint+LightGlue. O enunciado pede pelo menos 3 configurações
-  substancialmente diferentes, incluindo uma aprendida (§3). FAST+X e SIFT+LightGlue ficaram de fora
-  por escolha nossa; correm com `--methods`.
-- **Força bruta vs vizinho aproximado (passo 4):** estudo à parte na D39; o pipeline usa a força bruta.
-
-### D34 — Resultados do stitching (corrida de 2026-10-13)
-- **Estado:** Feita. Tabela `results/tables/stitching_T8.csv`; figuras em
-  `results/figures/stitching/<conjunto>/` com `legendas.md`; panoramas em `results/panoramas/<conjunto>/`.
-- **Máquina:** PC da Inês (AMD Ryzen 7 8700F, NVIDIA RTX 5060 Ti; D13). Referência central, RANSAC
-  3 px, média na sobreposição.
-
-  | Conjunto | Método | matches 1→2 / 2→3 | rácio de inliers 1→2 / 2→3 | erro dos inliers (px) | panorama (px) |
-  |---|---|---|---|---|---|
-  | keble | SIFT | 547 / 617 | 0,84 / 0,87 | 0,51 / 0,51 | 1502×669 |
-  | keble | ORB | 543 / 536 | 0,91 / 0,85 | 0,99 / 0,93 | 1491×669 |
-  | keble | KAZE | 703 / 646 | 0,95 / 0,93 | 0,49 / 0,54 | 1503×672 |
-  | keble | SuperPoint+NN | 556 / 552 | 0,92 / 0,87 | 1,07 / 1,10 | 1498×670 |
-  | keble | SuperPoint+LightGlue | 629 / 600 | 0,94 / 0,94 | 1,10 / 1,15 | 1495×667 |
-  | proprio | SIFT | 197 / 307 | 0,64 / 0,90 | 0,58 / 0,46 | 1757×1098 |
-  | proprio | ORB | 210 / 152 | 0,65 / 0,88 | 0,91 / 0,82 | 1758×1136 |
-  | proprio | KAZE | 316 / 228 | 0,79 / 0,77 | 0,50 / 0,65 | 1756×1094 |
-  | proprio | SuperPoint+NN | 310 / 191 | 0,88 / 0,81 | 1,13 / 1,21 | 1753×1086 |
-  | proprio | SuperPoint+LightGlue | 623 / 382 | 0,90 / 0,91 | 0,90 / 1,04 | 1765×1099 |
-
-- **Observações para o relatório:**
-  - Todos os métodos estimaram todas as homografias e produziram panorama nos dois conjuntos. Os
-    tamanhos dos panoramas diferem pouco entre métodos (≤ 12 px no `keble`; ≤ 50 px no `proprio`), o
-    que indica geometrias semelhantes.
-  - O `keble` é fácil para todos (rácio 0,84–0,95). No `proprio`, o par 1→2 separa os métodos: SIFT e
-    ORB ficam com 0,64–0,65, KAZE com 0,79 e os dois com SuperPoint com 0,88–0,90.
-  - O SuperPoint+LightGlue dá o maior nº de matches no `proprio` (623 e 382, contra ≤ 316 e ≤ 307 nos
-    restantes) e o rácio de inliers mais alto ou quase.
-  - **Erro de reprojeção:** SIFT e KAZE 0,46–0,65 px; ORB 0,82–0,99 px; SuperPoint 0,90–1,21 px. Não
-    quer dizer matches piores: o SuperPoint devolve os keypoints em píxeis inteiros, sem refinamento
-    sub-píxel (verificado: 100% das coordenadas são inteiras; SIFT e KAZE ≤ 1%; VERIFICACOES 3.3), e
-    isso põe um piso no erro. O ORB também não refina ao sub-píxel (26% das coordenadas inteiras, as
-    do nível 0 da pirâmide; as restantes vêm de níveis reduzidos).
-- **Limitações a referir:** 2 conjuntos de 3 imagens; sem ground-truth, a qualidade das homografias só se
-  mede pelos inliers, pelo erro de reprojeção e pela inspeção visual dos panoramas.
-
-### D35 — Estudo do limiar do RANSAC (§3.2)
-- **Estado:** Implementada e corrida em 2026-10-13 (`studies/ransac_study.run_threshold_study`).
-  Tabela `results/tables/ransac_threshold.csv`; figuras em `results/figures/ransac_study/`
-  (`inlier_ratio.png`, `panoramas.jpg`, `legendas.md`); panoramas em `results/panoramas/ransac/`.
-- **Desenho:** conjunto `keble` (`CFG["stitching"]["study_set"]`), os 5 métodos do stitching e
-  limiares de 0,5; 1; 2; 3; 5 e 10 px (`CFG["stitching"]["ransac_thresholds_px"]`). **Os matches de
-  cada método são os mesmos em todos os limiares**: só muda o limiar. Por par regista-se o nº e o rácio
-  de inliers, o erro de reprojeção e `corner_shift_px` (deslocamento médio dos 4 cantos projetados em
-  relação à H do limiar de 3 px). Os panoramas lado a lado são do SIFT.
-- **Rácio de inliers** (média dos 2 pares adjacentes):
-
-  | Método | 0,5 px | 1 px | 2 px | 3 px | 5 px | 10 px |
-  |---|---|---|---|---|---|---|
-  | SIFT | 0,51 | 0,76 | 0,84 | 0,85 | 0,86 | 0,86 |
-  | ORB | 0,20 | 0,51 | 0,81 | 0,88 | 0,91 | 0,91 |
-  | KAZE | 0,53 | 0,84 | 0,92 | 0,94 | 0,94 | 0,94 |
-  | SuperPoint+NN | 0,18 | 0,45 | 0,78 | 0,90 | 0,93 | 0,94 |
-  | SuperPoint+LightGlue | 0,17 | 0,44 | 0,82 | 0,94 | 0,99 | 1,00 |
-
-  Erro médio dos inliers no SIFT: 0,26 → 0,41 → 0,49 → 0,51 → 0,54 → 0,56 px.
-- **Observações para o relatório:**
-  - Abaixo de 2 px, os métodos sem localização sub-píxel (ORB, SuperPoint) perdem mais de metade dos
-    matches a 1 px (0,44–0,51), contra 0,76–0,84 no SIFT e no KAZE. O limiar tem de cobrir o ruído de
-    localização dos keypoints.
-  - De 3 para 10 px os clássicos ganham ≤ 0,03 de rácio. O SuperPoint+LightGlue chega a 1,00 a 10 px:
-    aceita praticamente todos os matches e o RANSAC deixa de filtrar. O erro dos inliers sobe sempre com
-    o limiar (SIFT 0,51 → 0,56 px; SuperPoint+LightGlue 1,13 → 1,30 px).
-  - **Escolha de 3 px:** o menor limiar em que todos os métodos ficam com rácio ≥ 0,85, perto do
-    patamar, e o mesmo valor do critério de correção da Parte 1 (§2.8).
-  - Efeito na geometria (SIFT): os cantos projetados mudam no máximo 2,4 px entre limiares, por isso os
-    panoramas do SIFT devem ser quase iguais (confirmar na figura `panoramas.jpg`). Nos métodos sem
-    sub-píxel chega a 8 px com 0,5–1 px de limiar.
-- **Limitação:** um só conjunto e 2 pares.
-
-### D36 — Estudo da imagem de referência (§3.3)
-- **Estado:** Implementada e corrida em 2026-10-13 (`studies/ransac_study.run_reference_study`).
-  Tabela `results/tables/reference.csv`; figuras em `results/figures/reference_study/`; panoramas em
-  `results/panoramas/reference/`.
-- **Desenho:** SIFT, nos dois conjuntos. As homografias entre imagens adjacentes são calculadas uma vez;
-  só muda a referência (imagem 1, 2 ou 3). Por referência: tamanho do canvas e **ampliação de área** de
-  cada imagem (área do quadrilátero projetado, pela fórmula do atacador, ÷ área original). Uma ampliação
-  longe de 1 quer dizer imagem esticada ou encolhida, e o erro das homografias compostas é ampliado na
-  mesma proporção.
-
-  | Conjunto | Referência | composições até à mais afastada | canvas (Mpx) | maior ampliação de área |
-  |---|---|---|---|---|
-  | keble | 1 (extremo) | 2 | 1,51 | 1,89× |
-  | keble | 2 (central) | 1 | 1,00 | 1,17× |
-  | keble | 3 (extremo) | 2 | 1,55 | 1,95× |
-  | proprio | 1 (extremo) | 2 | 2,16 | 1,22× |
-  | proprio | 2 (central) | 1 | 1,93 | 1,04× |
-  | proprio | 3 (extremo) | 2 | 1,97 | 1,11× |
-
-- **Observações para o relatório:** a referência central dá o canvas mais pequeno e a menor deformação
-  nos dois conjuntos. Com uma referência num extremo, a imagem do outro extremo passa por 2
-  homografias e fica quase com o dobro da área no `keble`. O efeito é menor no `proprio` (causa não
-  analisada). Compararam-se as 3 estratégias possíveis; o enunciado pede pelo
-  menos 2.
-- **Limitação:** sem ground-truth não se mede diretamente o erro acumulado; a ampliação de área e o
-  canvas são indicadores indiretos, a acompanhar pelas figuras.
-
-### D37 — Métodos aprendidos na avaliação da Parte 1: teste antes da corrida oficial (2026-10-14)
-- **Estado:** Feito. **Não são resultados para o relatório**: só confirmam que tudo corre e dão uma
-  ordem de grandeza.
-- **O que se correu:** `evaluation.evaluate_pairs` com SIFT, SuperPoint+NN, SuperPoint+LightGlue e
-  SIFT+LightGlue em 4 sequências (`i_ajuntament`, `i_dome`, `v_graffiti`, `v_wall`; 80 linhas) e no
-  teste sintético de rotação e escala, no PC da Inês (GPU). 0 erros; 9,2 s para o HPatches e 3,3 s para o
-  sintético.
-- **Resultados (4 sequências, médias por par):**
-
-  | Método | precisão `i` / `v` | matching score `i` / `v` | recall `i` / `v` | repetibilidade `i` / `v` |
-  |---|---|---|---|---|
-  | SIFT | 0,41 / 0,66 | 0,08 / 0,21 | 0,21 / 0,53 | 0,29 / 0,49 |
-  | SuperPoint+NN | 0,82 / 0,67 | 0,18 / 0,26 | 0,29 / 0,48 | 0,53 / 0,67 |
-  | SuperPoint+LightGlue | 0,82 / 0,79 | 0,44 / 0,41 | 0,90 / 0,92 | 0,53 / 0,67 |
-  | SIFT+LightGlue | 0,76 / 0,78 | 0,25 / 0,33 | 0,75 / 0,85 | 0,31 / 0,52 |
-
-- **Rotação (precisão):** SuperPoint+LightGlue ≥ 0,97 até 45° e ≤ 0,06 a partir de 60°;
-  SuperPoint+NN 0,87 a 30°, 0,54 a 45° e ≤ 0,20 a partir de 60°; SIFT e SIFT+LightGlue ≥ 0,98 em todos
-  os ângulos. **O SuperPoint não é invariante à rotação**: discutir na tabela de robustez.
-- **Escala (precisão a 0,5× / 2×):** SIFT 0,97 / 0,97; SIFT+LightGlue 0,98 / 0,94; SuperPoint+LightGlue
-  0,98 / 0,83; SuperPoint+NN 0,72 / 0,78.
-- **Tempos (GPU, ms):** extração por imagem SuperPoint 17–25 (o mesmo extrator mediu 16,9 numa
-  configuração e 24,6 na outra: variação entre medições), SIFT do pacote 75, SIFT clássico 59 + 47;
-  matching por par LightGlue 20–22, SuperPoint+NN 22 (força bruta em CPU com 256 dimensões).
-- **Para planear a corrida oficial:** os métodos aprendidos no HPatches completo devem demorar poucos
-  minutos na GPU (116/4 × ~9 s, com o SIFT incluído).
-
-### D38 — Plano para a corrida oficial (proposta, por acordar com a Carolina)
-- **Estado:** Proposta (2026-10-14). Resolve P03 e completa P10 se for aceite.
-- **Ordem:**
-  1. juntar os ramos (`carolina` e `Ines`) e a Carolina implementar a T4 (P05);
-  2. confirmar o ambiente na máquina escolhida (`4.13.0 True` no OpenCV; `torch.cuda.is_available()`);
-  3. confirmar a pasta do HPatches sem o nível repetido (D04, P11);
-  4. correr tudo de uma vez, na mesma máquina, com o mesmo `--tag` (ex.: `--tag final`);
-  5. atualizar a D28 (clássicos e T4) e a D37 (aprendidos) com os números oficiais.
-- **HPatches completo para todos os métodos** (resolve P03): na GPU os aprendidos demoram minutos (D37).
-- **Máquina:** a mesma para tudo, porque os tempos só são comparáveis assim (D28). Proposta: o PC da
-  Inês (desktop, Ryzen 7 8700F + RTX 5060 Ti), porque não tem as variações de tempo de ±50% observadas
-  no portátil em corridas longas (D28). Alternativa: o portátil da Carolina (i7-12650H, CUDA). Indicar no
-  relatório o CPU, a GPU e que **os clássicos correm em CPU e os aprendidos em GPU**.
-- **Opcional, para a discussão de tempo real (§5):** repetir só a T5 dos aprendidos em CPU
-  (`CFG["learned"]["device"] = "cpu"`) num subconjunto de sequências, para comparar com os clássicos no
-  mesmo hardware.
-- **Comandos** (pasta `Assignment1`):
-
-  ```bash
-  python src/main.py --part1 --tag final        # HPatches, 9 métodos (+ T4 quando existir)
-  python src/main.py --rotscale --tag final     # rotação e escala sintéticas, 9 métodos
-  python src/main.py --robustness --tag final
-  python src/main.py --graf --tag final
-  python src/main.py --qualitative
-  python src/main.py --fast --tag final         # só clássicos; separado, com a máquina fria (D28)
-  python src/main.py --brief --tag final        # só clássicos
-  python src/main.py --curves --tag final
-  python src/main.py --part2                    # stitching e estudos (D34–D36), na mesma máquina
-  python tests/test_sanity.py
-  ```
-
-- **Cuidados (D28):** máquina ligada à corrente, sem outros programas; `--part1` e `--fast` em
-  separado. Os pesos têm de estar na cache antes (a primeira execução descarrega-os).
-
-### D39 — Força bruta vs vizinho aproximado (FLANN) no stitching (§3.1, passo 4)
-- **Estado:** Implementada e corrida em 2026-10-15 (`studies/matcher_study.run_matcher_study`, dentro do
-  `--part2`). Resolve P12. Tabela `results/tables/matcher_bf_flann.csv`; figuras
-  `results/figures/matcher_study/<conjunto>.jpg` (SIFT, BF e FLANN) com `legendas.md`; panoramas em
-  `results/panoramas/matcher/`.
-- **Desenho:** os mesmos keypoints e descritores; muda só a pesquisa de vizinhos
-  (`matching.match_descriptors(..., matcher="bf" | "flann")`). O ratio 0,8, o cross-check e o RANSAC de
-  3 px são iguais. FLANN com os valores do tutorial do OpenCV (`CFG["matching"]["flann"]`): 5 KD-trees
-  aleatórias nos float (SIFT, KAZE), LSH (6 tabelas, chave de 12 bits, multi-probe 1) no binário (ORB),
-  `checks` = 50. Os tempos são a mediana de 5 medições depois de um aquecimento e incluem a construção
-  dos índices (duas por par, por causa do cross-check). Por par regista-se também `shared_with_bf`
-  (fração dos matches FLANN que existem na força bruta) e `corner_diff_px` (distância média dos 4
-  cantos projetados com a H do FLANN e com a H da força bruta).
-- **Resultados** (PC da Inês, CPU; pares 1→2 / 2→3):
-
-  | Conjunto | Método | tempo BF (ms) | tempo FLANN (ms) | matches BF / FLANN | matches FLANN também na BF | diferença dos cantos (px) |
-  |---|---|---|---|---|---|---|
-  | keble | SIFT | 13 / 14 | 72 / 71 | 547, 617 / 545, 622 | 0,99 / 0,99 | 0,3 / 0,4 |
-  | keble | KAZE | 6 / 5 | 44 / 43 | 703, 646 / 701, 646 | 1,00 / 0,99 | 0,5 / 0,2 |
-  | keble | ORB | 9 / 10 | 21 / 20 | 543, 536 / 550, 520 | 0,94 / 0,96 | 3,6 / 4,3 |
-  | proprio | SIFT | 13 / 13 | 76 / 73 | 197, 307 / 197, 303 | 1,00 / 0,98 | 0,7 / 10,2 |
-  | proprio | KAZE | 9 / 9 | 55 / 58 | 316, 228 / 314, 233 | 0,99 / 0,94 | 3,2 / 4,9 |
-  | proprio | ORB | 10 / 9 | 20 / 19 | 210, 152 / 216, 157 | 0,95 / 0,92 | 3,7 / 19,7 |
-
-  Os tempos variam entre corridas (na 2.ª, a força bruta do SIFT no keble deu 16 e 20 ms); os matches
-  e as homografias repetem-se exatamente (FLANN determinístico nesta configuração, verificado com 2
-  corridas).
-- **Observações para o relatório:**
-  - **O FLANN foi 2 a 7 vezes mais lento.** Com ≤ 2000 descritores por imagem, construir as árvores
-    custa mais do que a força bruta otimizada do OpenCV. O vizinho aproximado só compensa com conjuntos
-    muito maiores (não testado aqui).
-  - **Matches quase iguais:** 98–100% dos matches FLANN dos float existem na força bruta, e 92–96% no
-    ORB (o LSH é mais aproximado). O nº de inliers muda no máximo 15 (KAZE `proprio` 1→2).
-  - **Panoramas:** iguais à vista no `keble` (cantos a ≤ 0,5 px nos float). As diferenças maiores
-    (10 px no SIFT e 20 px no ORB, `proprio` 2→3) **não são do FLANN**: tirando 2% dos matches da força
-    bruta ao acaso (20 repetições), a H já muda tanto ou mais (mediana / máximo: SIFT 2,2 / 10,8 px; ORB
-    20,1 / 41,6 px nesse par; ≤ 2,3 px nos float do `keble`). Estes pares têm homografias pouco
-    estáveis, e os cantos estão longe da zona de sobreposição, onde a H é extrapolada.
-  - **Escolha:** força bruta em todas as experiências. É exata, é mais rápida com estes tamanhos, e as
-    diferenças entre métodos não se confundem com erros da pesquisa aproximada (D16).
-- **Nota sobre a D32:** o `cv2.findHomography` não usa o RNG global. Mudar `cv2.setRNGSeed` (seeds 0 a
-  10) não alterou nenhuma H, porque o RANSAC do OpenCV usa um gerador interno com seed fixa. O resultado
-  já era determinístico; o `setRNGSeed` no `estimate_homography` não faz mal, mas não é ele que o garante.
-- **Limitação:** 2 conjuntos e 3 métodos; tempos numa só máquina, numa só corrida.
+### D42 — SuperPoint+SuperGlue (2026-10-16)
+- **Estado:** Implementada (`learned.match_superglue`, método `SuperPoint+SuperGlue`, também no stitching).
+- **Porquê:** o enunciado refere o SuperGlue em §2.1, §2.6 (título "Light/SuperGlue" e comparação explícita:
+  o LightGlue teria "lower matching latency" que o SuperGlue) e §11. Não está na lista mínima do §4, mas
+  sem ele não se pode verificar a comparação do §2.6. Decisão da Carolina.
+- **Implementação:** Hugging Face `transformers` 5.18 (`SuperGlueForKeypointMatching`, pesos
+  `magic-leap-community/superglue_outdoor`, os originais da Magic Leap convertidos). Usa-se só o passo de
+  matching do modelo (`_match_image_pair`), com os keypoints, scores e descritores do mesmo SuperPoint
+  do SuperPoint+NN e do SuperPoint+LightGlue. O modelo completo correria o seu próprio SuperPoint numa
+  imagem redimensionada para 480×640, e a comparação deixava de isolar o matcher.
+  - **Normalização:** o SuperGlue normaliza cada imagem pelo seu tamanho (centro e 0,7 × lado maior);
+    a função do transformers só aceita um tamanho, por isso os pontos da imagem 2 são transformados
+    para que a normalização com o tamanho da imagem 1 dê o mesmo resultado. Pontos completados com
+    zeros e máscara quando as imagens têm números de pontos diferentes.
+- **Parâmetros:** `match_threshold` 0,2 e 100 iterações de Sinkhorn (valores do SuperGlue original; o
+  transformers usa 0,0 por omissão). Pesos "outdoor", os usados nas avaliações em HPatches.
+- **Teste (i_nescafe e v_graffiti):** recall 0,98 (i) e 0,88 (v), ao nível do LightGlue (0,95 e 0,88) e
+  muito acima do NN (0,65 e 0,20); tempo de matching mediano 309 ms contra 40 ms do LightGlue (GPU),
+  coerente com o §2.6 e com o artigo do LightGlue.
+- **Instalação:** `pip install transformers` no `cvc` em 2026-10-16 (5.18.0); OpenCV verificado depois
+  (4.13.0, `KAZE_create` presente). Acrescentado ao `requirements.txt`.
 
 ## Ambiente e repositório
 
@@ -1262,15 +1008,13 @@ Entradas D29–D38, escritas em 2026-10-14 sobre o código do commit `4615590` (
   parece disponível no `cvc`: torch cu126). **Proposta (2026-10-14):** HPatches completo, na GPU; os
   aprendidos demoram minutos (D37, D38).
 - **P04** — Data de entrega, língua e limite de páginas do relatório.
-- **P05 (2026-10-08)** — **Métricas da homografia por implementar** em `evaluation.py`: inliers do
-  RANSAC, rácio de inliers, erro médio de reprojeção, corner error e % de pares com erro ≤ 1/3/5 px
-  (tabela T4). Dependem de `homography.estimate_homography` (Pessoa B), que ainda não existe. Quando
-  existir: chamá-la em `evaluate_pair`, acrescentar as colunas e a T4 no `summarize`, e registar os
-  limiares no config. **Atualização (2026-10-14):** a função existe desde 2026-10-13 (ramo `Ines`,
-  commit `4615590`), com o contrato pedido (D32). Falta a parte da Carolina em `evaluation.py`.
-- **P06 (2026-10-08)** — ~~Pipelines aprendidos por registar em `methods.py`~~ Feito em 2026-10-13
-  (D29). Testados na avaliação da Parte 1 em 2026-10-14 (D37).
-- **P07 (2026-10-08, atualizado 2026-10-11)** — ~~Falta `--part2`~~ Feito em 2026-10-13 (D33–D36).
+- **P05 (2026-10-08)** — ~~Métricas da homografia por implementar em `evaluation.py`~~ Resolvido em
+  2026-10-15: tabela T4 implementada (D40).
+- **P06 (2026-10-08)** — **Pipelines aprendidos por registar** em `methods.py` (SuperPoint+NN,
+  SuperPoint+LightGlue, SIFT+LightGlue): depende de `learned.py` (Pessoa B).
+- **P07 (2026-10-08, atualizado 2026-10-11)** — `main.py`: existem `--part1`, `--rotscale`,
+  `--robustness`, `--qualitative`, `--graf`, `--fast`, `--brief` e `--curves`. Falta `--part2`
+  (Pessoa B).
 - **P09 (2026-10-12)** — ~~Threshold do FAST: 20 ou 10~~ Resolvido no mesmo dia: passa a 10 (D09).
 - **P10 (2026-10-12)** — ~~Repetir as corridas depois da mudança do threshold do FAST e da
   simplificação~~ Feito no mesmo dia: os resultados atuais estão na D28 e em `results/`. Os números das

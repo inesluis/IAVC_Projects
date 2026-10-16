@@ -1,4 +1,4 @@
-"""Gráficos feitos a partir das tabelas já calculadas, sem repetir corridas (D26).  [Pessoa A]
+"""Gráficos feitos a partir das tabelas já calculadas, sem repetir corridas  
 
 F1  curvas por nível: uma figura por categoria (i, v, rot, scale) e por métrica, uma linha por método.
     O nível é o par 1->k (HPatches), o ângulo (rotação) ou o fator (escala).
@@ -6,10 +6,8 @@ F2  exatidão contra tempo: um ponto por método, para iluminação e para ponto
 """
 
 from pathlib import Path
-
 import matplotlib.pyplot as plt
 import pandas as pd
-
 from visualization import plot_curves, plot_scatter, save_figure
 
 METRICS = {"precision": "Precisão", "matching_score": "Matching score",
@@ -19,27 +17,20 @@ CATEGORY_NAMES = {"i": "iluminação (HPatches i_*)", "v": "ponto de vista (HPat
 X_LABELS = {"i": "Par de imagens", "v": "Par de imagens", "rot": "Ângulo de rotação (°)",
             "scale": "Fator de escala (eixo logarítmico)"}
 MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*", "h", "<"]
-
-
-def method_styles(methods) -> dict:
-    """Cor e marcador de cada método, iguais em todas as figuras."""
+ 
+def method_styles(methods) -> dict: 
     colors = plt.get_cmap("tab10").colors
     return {m: {"color": colors[i], "marker": MARKERS[i]} for i, m in enumerate(methods)}
-
-
-def comma(value: float) -> str:
-    """Número com vírgula decimal."""
+ 
+def comma(value: float) -> str: 
     return f"{value:g}".replace(".", ",")
-
-
+ 
 def protocol_text(cfg: dict) -> str:
     return (f"Protocolo: limite de {cfg['max_keypoints']} keypoints por imagem, ratio test "
             f"{comma(cfg['matching']['ratio'])} + cross-check, match correto se o erro com a homografia "
             f"ground-truth for < {comma(cfg['eval']['eps_px'])} px.")
-
-
-def level_ticks(category: str, levels):
-    """Posições e rótulos do eixo x, e uma frase para a legenda sobre o que é cada nível."""
+ 
+def level_ticks(category: str, levels): 
     if category in ("i", "v"):
         labels = [f"1→{int(k)}" for k in levels]
         if category == "v":
@@ -51,10 +42,9 @@ def level_ticks(category: str, levels):
         ticks = [k for k in levels if k % 30 == 0]
         return ticks, [f"{int(k)}" for k in ticks], "a imagem base rodada em torno do centro; 0° é o controlo"
     return levels, [comma(k) for k in levels], "a imagem base escalada em torno do centro; 1 é o controlo"
-
-
+ 
 def plot_level_curves(df: pd.DataFrame, cfg: dict, folder: Path) -> list:
-    """F1: cada métrica em função do nível, por categoria. Devolve [(ficheiro, legenda)]."""
+    # F1: cada métrica em função do nível, por categoria.  
     methods = list(df["method"].unique())
     styles = method_styles(methods)
     captions = []
@@ -85,10 +75,9 @@ def plot_level_curves(df: pd.DataFrame, cfg: dict, folder: Path) -> list:
             captions.append((path, f"{metric_name} de cada método em {category_name}, em função de: {x_name}. "
                                    f"{how} {protocol_text(cfg)}"))
     return captions
-
-
+ 
 def plot_tradeoff(df: pd.DataFrame, cfg: dict, folder: Path) -> list:
-    """F2: tempo total por par contra matching score e contra precisão, para i e v."""
+    # F2: tempo total por par contra matching score e contra precisão, para i e v 
     methods = list(df["method"].unique())
     styles = method_styles(methods)
     captions = []
@@ -108,4 +97,4 @@ def plot_tradeoff(df: pd.DataFrame, cfg: dict, folder: Path) -> list:
                                    f"{METRICS[column].lower()} médio contra o tempo total médio por par, um ponto "
                                    f"por método (média de {n_pairs} pares). Tempo total = 2 × (deteção + descrição) "
                                    f"+ matching, em ms, eixo logarítmico. {protocol_text(cfg)}"))
-    return captions
+    return captions 

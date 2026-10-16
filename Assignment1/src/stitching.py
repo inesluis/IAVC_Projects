@@ -1,54 +1,16 @@
-"""
-stitching.py — Construção de panoramas (warp + canvas + média)
-
-Passos 9 a 12 do enunciado (§3.1):
-     9. Deformar (warp) cada imagem para o referencial da imagem de referência.
-    10. Criar um canvas suficientemente grande para conter todas as imagens.
-    11. Compor as imagens; na zona de sobreposição faz-se a MÉDIA dos pixels.
-    12. Repetir para várias imagens (ex.: 3 imagens, com referências diferentes).
-
-Não se usa o cv2.Stitcher: o canvas e a composição são feitos aqui.
-
-Funções:
-    load_panorama_images()      -> lê um conjunto de imagens (reduz as muito grandes)
-    match_adjacent()            -> matches de cada par de imagens adjacentes
-    estimate_adjacent()         -> homografia RANSAC e estatísticas de cada par
-    compute_canvas()            -> tamanho do canvas e translação T
-    warp_to_canvas()            -> deforma uma imagem para o canvas + máscara
-    blend_average()             -> média das imagens na sobreposição
-    stitch_images()             -> panorama de N imagens (dadas as homografias)
-    stitch_pair()               -> atalho para 2 imagens
-
-Teste rápido (2 ou mais imagens, da esquerda para a direita):
-    python src/stitching.py data/Panorama/keble_a.jpg data/Panorama/keble_b.jpg
-    python src/stitching.py data/Panorama/keble_a.jpg data/Panorama/keble_b.jpg data/Panorama/keble_c.jpg --ref 1
-    python src/stitching.py data/Panorama/keble_a.jpg data/Panorama/keble_b.jpg --method SuperPoint+LightGlue
-"""
-
-import argparse
+# stitching.py — Construção de panoramas (warp + canvas + média)
 
 import cv2
 import numpy as np
-
-from config import get_config, set_seeds
-from datasets import imwrite, load_image, load_image_set
-from homography import chain_to_reference, estimate_homography, project_points
-from methods import ALL_METHODS, extract_features, match_features
+from datasets import load_image_set
+from homography import chain_to_reference, estimate_homography, image_corners, project_points
+from methods import match_features
 
 # Limite de segurança: uma homografia errada pode projetar os cantos para muito
-# longe e pedir um canvas gigantesco (que esgota a memória).
+# longe e pedir um canvas gigantesco
 MAX_CANVAS_SIDE = 20000  # px
 
-
-# ---------------------------------------------------------------------------
 # CANVAS
-# ---------------------------------------------------------------------------
-def image_corners(image: np.ndarray) -> np.ndarray:
-    """Os 4 cantos de uma imagem, como array (4, 2) de pontos (x, y)."""
-    h, w = image.shape[:2]
-    return np.float64([[0, 0], [w, 0], [w, h], [0, h]])
-
-
 def compute_canvas(images, homographies):
     """
     Calcula o tamanho do canvas que contém todas as imagens depois de deformadas.
@@ -78,7 +40,6 @@ def compute_canvas(images, homographies):
                   [0, 0, 1]], dtype=np.float64)
     return T, (width, height)
 
-
 # ---------------------------------------------------------------------------
 # WARP + COMPOSIÇÃO
 # ---------------------------------------------------------------------------
@@ -100,7 +61,6 @@ def warp_to_canvas(image, H, T, canvas_size):
     mask = cv2.warpPerspective(ones, M, canvas_size)
     return warped, mask
 
-
 def blend_average(warped_images, masks):
     """
     Junta as imagens deformadas, fazendo a média onde se sobrepõem.
@@ -116,15 +76,13 @@ def blend_average(warped_images, masks):
     panorama = np.divide(total, count, out=np.zeros_like(total), where=count > 1e-6)
     return np.clip(panorama, 0, 255).astype(np.uint8)
 
-
 def stitch_images(images, homographies):
-    """
-    Constrói o panorama de N imagens a cores.
+    # Constrói o panorama de N imagens a cores.
 
-    images:        lista de imagens BGR
-    homographies:  homographies[i] leva a imagem i para a imagem de REFERÊNCIA
-                   (para a própria referência é a identidade, np.eye(3))
-    """
+    # images:        lista de imagens BGR
+    # homographies:  homographies[i] leva a imagem i para a imagem de REFERÊNCIA
+    #                (para a própria referência é a identidade, np.eye(3))
+     
     T, canvas_size = compute_canvas(images, homographies)
 
     warped_images, masks = [], []
@@ -135,11 +93,15 @@ def stitch_images(images, homographies):
 
     return blend_average(warped_images, masks)
 
-
-def stitch_pair(img_ref, img_mov, H_mov_to_ref):
-    """Panorama de 2 imagens: img_mov é deformada para o referencial de img_ref."""
-    return stitch_images([img_ref, img_mov], [np.eye(3), H_mov_to_ref])
-
+def stitch_or_none(images, pairs, ref: int):
+    # Panorama com a imagem de referência dada, ou None se faltar uma homografia ou o canvas for absurdo
+    if any(pair["H"] is None for pair in pairs):
+        return None
+    try:
+        return stitch_images(images, chain_to_reference([pair["H"] for pair in pairs], ref))
+    except ValueError as error:
+        print(error)
+        return None
 
 # ---------------------------------------------------------------------------
 # DAS IMAGENS ÀS HOMOGRAFIAS
@@ -165,11 +127,9 @@ def load_panorama_images(folder, cfg: dict):
         grays.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY))
     return names, images, grays
 
-
 def match_adjacent(method: str, features, cfg: dict) -> list:
-    """Matches putativos de cada par de imagens adjacentes: a posição i é o par (i, i+1)."""
+    # Matches putativos de cada par de imagens adjacentes: a posição i é o par (i, i+1) 
     return [match_features(method, features[i], features[i + 1], cfg)[0] for i in range(len(features) - 1)]
-
 
 def estimate_adjacent(features, matches, cfg: dict) -> list:
     """
@@ -184,44 +144,4 @@ def estimate_adjacent(features, matches, cfg: dict) -> list:
         pairs.append({"H": H, "inliers": inliers, "N_matches": len(pair_matches), "N_inliers": n_inliers,
                       "inlier_ratio": n_inliers / len(pair_matches) if pair_matches else 0.0,
                       "reproj_err_px": error})
-    return pairs
-
-
-# ---------------------------------------------------------------------------
-# TESTE RÁPIDO (só para validar o código)
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    cfg = get_config()
-    set_seeds(cfg)
-
-    ap = argparse.ArgumentParser(description="Teste rápido do stitching.")
-    ap.add_argument("images", nargs="+", help="2 ou mais imagens, por ordem (esquerda -> direita)")
-    ap.add_argument("--method", default="SIFT", choices=ALL_METHODS, help="detetor/descritor/matcher")
-    ap.add_argument("--ref", type=int, default=None, help="índice da imagem de referência (por omissão: a central)")
-    ap.add_argument("--thr", type=float, default=None, help="limiar do RANSAC em px (por omissão: o do config)")
-    ap.add_argument("--out", default=str(cfg["paths"]["panoramas"] / "panorama.jpg"))
-    args = ap.parse_args()
-
-    if len(args.images) < 2:
-        ap.error("são precisas pelo menos 2 imagens")
-    if args.thr is not None:
-        cfg["ransac"]["thr_px"] = args.thr
-
-    loaded = [load_image(p) for p in args.images] # (cores, cinzento); o cinzento é só para detetar
-    images = [bgr for bgr, _ in loaded]
-    features = [extract_features(args.method, gray, cfg) for _, gray in loaded]
-    ref = len(images) // 2 if args.ref is None else args.ref
-
-    # Homografia entre cada par de imagens adjacentes: i -> i+1
-    pairs = estimate_adjacent(features, match_adjacent(args.method, features, cfg), cfg)
-    for i, pair in enumerate(pairs):
-        if pair["H"] is None:
-            raise SystemExit(f"Não foi possível estimar a homografia do par {i}->{i + 1} "
-                             f"({pair['N_matches']} matches).")
-        print(f"par {i}->{i + 1}: matches={pair['N_matches']} inliers={pair['N_inliers']} "
-              f"rácio={pair['inlier_ratio']:.3f} erro médio={pair['reproj_err_px']:.3f} px")
-
-    # Leva todas as imagens para a referência e compõe o panorama
-    panorama = stitch_images(images, chain_to_reference([pair["H"] for pair in pairs], ref))
-    imwrite(args.out, panorama)
-    print(f"método={args.method} referência={ref} panorama={panorama.shape[1]}x{panorama.shape[0]} px -> {args.out}")
+    return pairs 

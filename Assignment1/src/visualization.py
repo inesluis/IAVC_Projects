@@ -39,7 +39,7 @@ def plot_matches(img1, img2, kps1, kps2, matches, good, label1: str, label2: str
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 13 * h / w + 0.9), layout="constrained")
     show_image(ax1, img1, label1)
     show_image(ax2, img2, label2)
-    ax2.yaxis.tick_right()                   # eixo y da 2.ª imagem à direita, para as linhas não o taparem
+    ax2.yaxis.tick_right()                    
     ax2.yaxis.set_label_position("right")
 
     good = np.asarray(good, dtype=bool)
@@ -47,7 +47,7 @@ def plot_matches(img1, img2, kps1, kps2, matches, good, label1: str, label2: str
     if len(matches) > max_lines:
         shown = np.sort(np.random.default_rng(seed).choice(len(matches), max_lines, replace=False))
 
-    for is_good, color in ((True, GREEN), (False, RED)):   # os errados por cima, para se verem
+    for is_good, color in ((True, GREEN), (False, RED)):   
         for i in shown[good[shown] == is_good]:
             p = kps1[matches[i].queryIdx].pt
             q = kps2[matches[i].trainIdx].pt
@@ -78,7 +78,7 @@ def plot_curves(series, xlabel: str, ylabel: str, title: str, hlines=(), logx: b
     if xticks is not None:
         ax.set_xticks(xticks)
         ax.set_xticklabels(xticklabels if xticklabels is not None else [f"{v:g}" for v in xticks])
-        ax.xaxis.set_minor_locator(NullLocator())   # só os ticks pedidos
+        ax.xaxis.set_minor_locator(NullLocator())    
     if ylim is not None:
         ax.set_ylim(*ylim)
     ax.set_xlabel(xlabel)
@@ -108,7 +108,7 @@ def plot_test_pattern(pairs: np.ndarray, patch_size: int, title: str):
         ax.plot([x1, x2], [y1, y2], color="#1f77b4", linewidth=0.7, alpha=0.7)
     ax.scatter(pairs[:, [0, 2]].ravel(), pairs[:, [1, 3]].ravel(), s=4, color="black", zorder=3)
     ax.set_xlim(-half - 1, half + 1)
-    ax.set_ylim(half + 1, -half - 1)   # y cresce para baixo, como na imagem
+    ax.set_ylim(half + 1, -half - 1)    
     ax.set_aspect("equal")
     ax.set_xlabel("x (px, relativo ao centro do patch)")
     ax.set_ylabel("y (px, relativo ao centro do patch)")
@@ -117,7 +117,6 @@ def plot_test_pattern(pairs: np.ndarray, patch_size: int, title: str):
     return fig
  
 def plot_image_grid(images, titles, title: str, ncols: int = 1):
-    # Várias imagens numa grelha (por exemplo, panoramas a comparar), cada uma com o seu título
     nrows = -(-len(images) // ncols)
     h = max(img.shape[0] for img in images)
     w = max(img.shape[1] for img in images)
@@ -134,7 +133,7 @@ def save_figure(fig, path) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.suffix == ".jpg":
-        fig.savefig(path, dpi=150, pil_kwargs={"quality": 92})   # fotografias: bem mais leve que PNG
+        fig.savefig(path, dpi=150, pil_kwargs={"quality": 92})   
     else:
         fig.savefig(path, dpi=150)
     plt.close(fig)

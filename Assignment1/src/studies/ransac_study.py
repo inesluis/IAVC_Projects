@@ -1,15 +1,6 @@
-"""Estudo do limiar do RANSAC e da escolha da imagem de referência.
-
-Limiar: com os mesmos matches, varia-se só o limiar e regista-se o nº de inliers,
-o erro de reprojeção e o efeito no panorama.
-  results/figures/ransac_study/inlier_ratio.png     rácio de inliers em função do limiar, por método
-  results/figures/ransac_study/panoramas.jpg        panoramas lado a lado, um por limiar
-  results/panoramas/ransac/<conjunto>_thr<limiar>.jpg
-
-Referência: com as mesmas homografias adjacentes, muda-se só a imagem de referência.
-  results/figures/reference_study/<conjunto>.jpg    panoramas lado a lado, um por referência
-  results/panoramas/reference/<conjunto>_ref<i>.jpg
-"""
+# Estudo do limiar do RANSAC e da escolha da imagem de referência
+# Limiar: com os mesmos matches, varia-se só o limiar e regista-se o nº de inliers, o erro de reprojeção e o efeito no panorama  
+# Referência: com as mesmas homografias adjacentes, muda-se só a imagem de referência. 
 
 import copy
 from pathlib import Path 
@@ -24,14 +15,7 @@ from studies.curves import comma, method_styles
 from studies.stitching_study import matching_text, ransac_text
 from visualization import plot_curves, plot_image_grid, save_figure
 
-
 def run_threshold_study(methods, cfg: dict):
-    """Varia o limiar do RANSAC num conjunto de imagens fixo. Devolve (tabela, legendas).
-
-    Uma linha por (método, par, limiar). corner_shift_px mede o efeito na geometria do panorama:
-    distância média entre os cantos da imagem projetados com a H deste limiar e com a H do limiar
-    do config.
-    """
     params = cfg["stitching"]
     set_name, thresholds = params["study_set"], params["ransac_thresholds_px"]
     names, images, grays = load_panorama_images(params["sets"][set_name], cfg)
@@ -60,7 +44,7 @@ def run_threshold_study(methods, cfg: dict):
     df = pd.DataFrame(rows)
     captions = []
 
-    # rácio de inliers em função do limiar: média dos pares adjacentes, uma linha por método
+    # rácio de inliers em função do limiar 
     means = df.groupby(["method", "thr_px"])["inlier_ratio"].mean()
     styles = method_styles(methods)
     series = [{"x": thresholds, "y": [means.loc[(m, thr)] for thr in thresholds], "label": m,
@@ -96,18 +80,11 @@ def run_threshold_study(methods, cfg: dict):
     return df, captions
 
 def polygon_area(points: np.ndarray) -> float:
-    # Área de um polígono dado pelos vértices (N, 2), pela fórmula do atacador 
+    # área de um polígono dado pelos vértices (N, 2), pela fórmula do atacador 
     x, y = points[:, 0], points[:, 1]
     return 0.5 * abs(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
  
 def run_reference_study(cfg: dict):
-    """Compara todas as escolhas de imagem de referência em cada conjunto. Devolve (tabela, legendas).
-
-    As homografias adjacentes são as mesmas; só muda a composição. Uma linha por (conjunto, referência):
-    tamanho do canvas e ampliação de área de cada imagem (área depois do warp / área original). Uma
-    ampliação longe de 1 quer dizer que a imagem ficou esticada ou encolhida, e que o erro das
-    homografias compostas é ampliado na mesma proporção.
-    """
     params = cfg["stitching"]
     method = params["study_method"]
     rows, captions = [], []

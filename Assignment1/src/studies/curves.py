@@ -1,10 +1,3 @@
-"""Gráficos feitos a partir das tabelas já calculadas, sem repetir corridas  
-
-F1  curvas por nível: uma figura por categoria (i, v, rot, scale) e por métrica, uma linha por método.
-    O nível é o par 1->k (HPatches), o ângulo (rotação) ou o fator (escala).
-F2  exatidão contra tempo: um ponto por método, para iluminação e para ponto de vista.
-"""
-
 from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd

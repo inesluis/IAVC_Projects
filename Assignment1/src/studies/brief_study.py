@@ -13,8 +13,7 @@ DESCRIPTIONS = {
     "GV": "X fixo no centro e Y em todos os pontos de uma grelha polar",
 }
 
-def plot_patterns(cfg: dict, folder: Path) -> list:
-    # Uma figura por estratégia com os pares de teste, como a Fig. 2 do artigo 
+def plot_patterns(cfg: dict, folder: Path) -> list: 
     S, n_bits = cfg["brief_own"]["patch_size"], cfg["brief_own"]["n_bits"]
     captions = []
     for strategy in STRATEGIES:

@@ -9,10 +9,7 @@
     python src/main.py --curves         # gráficos a partir das tabelas já calculadas
     python src/main.py --part2          # stitching: configurações, limiar do RANSAC e imagem de referência
 
-Opções: --tag NOME, --seqs SEQ1 SEQ2 ... e --methods M1 M2 ... (só alguns métodos; por omissão correm
-os clássicos e os aprendidos, e no --part2 os de cfg["stitching"]["methods"]).
-"""
-
+""" 
 import argparse 
 import pandas as pd 
 from config import get_config, set_seeds
@@ -29,8 +26,7 @@ from studies.rot_scale_study import make_pairs
 from studies.stitching_study import run_stitching
 from visualization import save_captions
 
-def run_part1(cfg, prefix, seqs, methods):
-    # Avalia os métodos em todos os pares do HPatches
+def run_part1(cfg, prefix, seqs, methods): 
     df = evaluate_pairs(methods, hpatches_pairs(cfg, seqs), cfg)
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}raw.csv", index=False)
     tables = summarize(df, cfg)
@@ -38,16 +34,14 @@ def run_part1(cfg, prefix, seqs, methods):
     print(tables["T2_matching"].round(3).to_string())
     print(tables["T4_homography"].round(3).to_string())
  
-def run_rotscale(cfg, prefix, methods):
-    # Avalia os métodos no teste sintético de rotação e escala
+def run_rotscale(cfg, prefix, methods): 
     df = evaluate_pairs(methods, make_pairs(cfg), cfg)
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}rotscale_raw.csv", index=False)
     tables = summarize(df, cfg)
     save_tables(tables, cfg["paths"]["tables"], prefix + "rotscale_")
     print(tables["T2_matching"].round(3).to_string())
  
-def run_robustness(cfg, prefix):
-    # Junta as duas corridas anteriores numa tabela método x (i, v, rot, scale).
+def run_robustness(cfg, prefix): 
     tables_dir = cfg["paths"]["tables"]
     df = pd.concat([pd.read_csv(tables_dir / f"{prefix}raw.csv"),
                     pd.read_csv(tables_dir / f"{prefix}rotscale_raw.csv")], ignore_index=True)
@@ -55,8 +49,7 @@ def run_robustness(cfg, prefix):
     table.to_csv(tables_dir / f"{prefix}robustness.csv", float_format="%.4f")
     print(table.round(3).to_string())
  
-def run_graf(cfg, prefix, methods):
-    # Métricas nos dois pares GRAF. São só 2 pares: mostra-se cada um, sem médias (D23).
+def run_graf(cfg, prefix, methods): 
     df = evaluate_pairs(methods, load_graf_pairs(cfg), cfg)
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}graf_raw.csv", index=False)
     df["pair"] = "1->" + df["k"].astype(str)
@@ -67,8 +60,7 @@ def run_graf(cfg, prefix, methods):
     table.to_csv(cfg["paths"]["tables"] / f"{prefix}graf_pairs.csv", float_format="%.4f")
     print(table.round(3).to_string())
  
-def run_fast(cfg, prefix, seqs):
-    # Estudo do FAST: tabela T6, gráficos e legendas.
+def run_fast(cfg, prefix, seqs): 
     df = run_fast_study(cfg, seqs)
     df.to_csv(cfg["paths"]["tables"] / f"{prefix}fast_raw.csv", index=False)
     table = summarize_fast(df)
@@ -77,9 +69,7 @@ def run_fast(cfg, prefix, seqs):
     folder = cfg["paths"]["figures"] / "fast_study"
     save_captions(plot_fast(df, cfg, folder), folder / "legendas.md", "estudo do FAST")
  
-def run_brief(cfg, prefix, seqs):
-    # BRIEF próprio (4 estratégias) contra o BRIEF do OpenCV, com os mesmos keypoints FAST,
-    # nas 4 categorias: tabela T7 e figuras dos padrões de teste.
+def run_brief(cfg, prefix, seqs): 
     methods = ["FAST+BRIEF"] + BRIEF_OWN_METHODS
     df = pd.concat([evaluate_pairs(methods, hpatches_pairs(cfg, seqs), cfg),
                     evaluate_pairs(methods, make_pairs(cfg), cfg)], ignore_index=True)
@@ -94,7 +84,7 @@ def run_brief(cfg, prefix, seqs):
     save_captions(plot_patterns(cfg, folder), folder / "legendas.md", "BRIEF próprio")
  
 def run_curves(cfg, prefix):
-    # Gráficos F1 e F2 dos métodos clássicos e, se existir, do estudo do BRIEF próprio 
+    # gráficos F1 e F2 dos métodos clássicos e do estudo do BRIEF próprio 
     tables_dir, figures_dir = cfg["paths"]["tables"], cfg["paths"]["figures"]
     jobs = {
         "curves": [f"{prefix}raw.csv", f"{prefix}rotscale_raw.csv"],
@@ -110,10 +100,7 @@ def run_curves(cfg, prefix):
         save_captions(captions, folder / "legendas.md", name)
         print(f"{name}: {len(captions)} figuras em {folder}")
 
-def run_part2(cfg, prefix, methods):
-    # Parte 2: stitching com várias configurações (tabela T8), estudo do limiar do RANSAC e
-    # comparação de imagens de referência. Os panoramas ficam em results/panoramas/ 
-    
+def run_part2(cfg, prefix, methods): 
     tables_dir, figures_dir = cfg["paths"]["tables"], cfg["paths"]["figures"]
     tables_dir.mkdir(parents=True, exist_ok=True)
 

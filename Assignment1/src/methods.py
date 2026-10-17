@@ -1,14 +1,13 @@
-# Lista dos métodos avaliados e as duas funções que os correm: extrair e emparelhar.
+# Lista dos métodos avaliados e as duas funções que os correm: extrair e emparelhar 
 
 from descriptors import BRIEF_OWN_NAMES, extract
 from learned import extract_sift_lg, extract_superpoint, match_lightglue, match_superglue
 from matching import match_descriptors
 
-# As configurações clássicas mínimas do enunciado
+# Configurações clássicas 
 CLASSIC_METHODS = ["SIFT", "ORB", "KAZE", "FAST+BRIEF", "FAST+BRISK", "FAST+FREAK"]
 
-# Métodos aprendidos. Nos nomes "A+B", A é o extrator e B o matcher: NN é o matching de descritores
-# dos clássicos (ratio test + cross-check); SuperGlue e LightGlue são matchers aprendidos
+# Métodos aprendidos
 LEARNED_METHODS = ["SuperPoint+NN", "SuperPoint+SuperGlue", "SuperPoint+LightGlue", "SIFT+LightGlue"]
 
 ALL_METHODS = CLASSIC_METHODS + LEARNED_METHODS

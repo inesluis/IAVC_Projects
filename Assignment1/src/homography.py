@@ -26,25 +26,14 @@ def corner_distance(H_a, H_b, image: np.ndarray) -> float:
     return float(np.linalg.norm(project_points(corners, H_a) - project_points(corners, H_b), axis=1).mean())
 
 def estimate_homography(kps1, kps2, matches, cfg: dict):
-    # Estima com RANSAC a homografia que leva a imagem 1 para a imagem 2
-
-    """ RANSAC (dentro do cv2.findHomography):
-      1. escolhe 4 matches ao acaso e calcula uma H candidata;
-      2. conta os matches com erro de reprojeção abaixo do limiar (os inliers);
-      3. repete e fica com a H que tem mais inliers;
-      4. no fim, recalcula H com todos os inliers dessa hipótese.
-    Um limiar pequeno dá poucos inliers; um limiar grande aceita matches errados e a H fica pior.
-
-    Os parâmetros vêm de cfg["ransac"]. Devolve (H, máscara booleana dos inliers, erro médio de
-    reprojeção dos inliers em px). Com menos de 4 matches ou se a estimação falhar: (None, None, nan).
-    """
+    # Estima com RANSAC a homografia que leva a imagem 1 para a imagem 2 
     if len(matches) < MIN_MATCHES:
         return None, None, np.nan
     p1 = np.float32([kps1[m.queryIdx].pt for m in matches])
     p2 = np.float32([kps2[m.trainIdx].pt for m in matches])
 
     ransac = cfg["ransac"]
-    cv2.setRNGSeed(cfg["seed"])   # o RANSAC é aleatório: assim o resultado não depende das chamadas anteriores
+    cv2.setRNGSeed(cfg["seed"])    
     H, mask = cv2.findHomography(p1, p2, cv2.RANSAC, ransacReprojThreshold=ransac["thr_px"],
                                  maxIters=ransac["max_iters"], confidence=ransac["confidence"])
     if H is None:
@@ -56,18 +45,6 @@ def estimate_homography(kps1, kps2, matches, cfg: dict):
     return H, inliers, float(reprojection_errors(p1[inliers], p2[inliers], H).mean())
  
 def chain_to_reference(adjacent: list, ref_index: int) -> list:
-    """Compõe homografias entre imagens adjacentes para as levar todas à mesma referência
-
-    adjacent[i] leva a imagem i para a imagem i+1 (N imagens, N-1 matrizes). Devolve N matrizes:
-    a posição i leva a imagem i para a imagem ref_index.
-
-    Exemplo com 3 imagens A, B, C (adjacent = [H_AB, H_BC]):
-        referência B (central):   A: H_AB    B: I             C: inv(H_BC)
-        referência A (extremo):   A: I       B: inv(H_AB)     C: inv(H_AB) · inv(H_BC)
-
-    Cada multiplicação junta o erro de mais uma homografia, por isso as imagens mais longe da
-    referência ficam com mais erro acumulado.
-    """
     n_images = len(adjacent) + 1
     to_ref = [None] * n_images
     to_ref[ref_index] = np.eye(3)

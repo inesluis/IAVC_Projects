@@ -1,20 +1,4 @@
-"""Métodos aprendidos: SuperPoint, SIFT do LightGlue e os matchers LightGlue e SuperGlue.
-
-Implementação e pesos pré-treinados: pacote cvg/LightGlue (Lindenberger, Sarlin e Pollefeys, ICCV 2023);
-SuperGlue (Sarlin et al., CVPR 2020) do Hugging Face transformers, com os pesos originais da Magic Leap.
-
-Papéis:
-  - SuperPoint é um detetor + descritor: uma rede dá, numa só passagem, os keypoints e os descritores
-    de 256 valores. Por isso não há tempos separados: t_det é o tempo total e t_desc é 0.
-  - LightGlue e SuperGlue são só matchers: recebem os keypoints e os descritores das duas imagens e
-    devolvem os pares. Precisam dos tensores do extrator, que ficam guardados em Features.raw. Os dois
-    recebem os mesmos keypoints e descritores do SuperPoint que o SuperPoint+NN.
-  - O LightGlue treinado para SIFT espera o SIFT do próprio pacote (RootSIFT, com escala e orientação),
-    que não tem os mesmos parâmetros do cv2.SIFT dos métodos clássicos.
-
-Os keypoints são devolvidos nas coordenadas da imagem original, mesmo que cfg["learned"]["resize"]
-reduza a imagem antes de a passar à rede.
-"""
+# Métodos aprendidos: SuperPoint, SIFT do LightGlue e os matchers LightGlue e SuperGlue  
 
 import time 
 import cv2
@@ -23,9 +7,7 @@ from lightglue import SIFT, LightGlue, SuperPoint
 from transformers import SuperGlueForKeypointMatching
 from interface import Features
  
-EXTRACTORS = {"superpoint": SuperPoint, "sift": SIFT}
-
-# Features.method de cada extrator; o LightGlue usa-o para escolher os pesos
+EXTRACTORS = {"superpoint": SuperPoint, "sift": SIFT} 
 METHOD_NAMES = {"superpoint": "SuperPoint", "sift": "SIFT-LG"}
 
 _models = {} 
@@ -34,7 +16,7 @@ def get_device(cfg: dict) -> str:
     return cfg["learned"]["device"] or ("cuda" if torch.cuda.is_available() else "cpu")
  
 def get_extractor(kind: str, cfg: dict):
-    # Extrator "superpoint" ou "sift", com o limite de keypoints do config 
+    # Extrator "superpoint" ou "sift" 
     key = (kind, get_device(cfg), cfg["max_keypoints"])
     if key not in _models:
         model = EXTRACTORS[kind](max_num_keypoints=cfg["max_keypoints"])
@@ -65,7 +47,6 @@ def extract_learned(kind: str, gray, cfg: dict) -> Features:
     try:
         raw = extractor.extract(image, resize=cfg["learned"]["resize"])
     except ValueError:
-        # o SIFT do pacote falha quando não deteta nenhum ponto (imagem sem textura)
         if kind != "sift":
             raise
         raw = None
@@ -127,13 +108,6 @@ def padded(t1, t2, n: int):
 
 @torch.no_grad()
 def match_superglue(f1: Features, f2: Features, cfg: dict):
-    """
-    Emparelha com o SuperGlue os keypoints e descritores do SuperPoint. Devolve (matches, tempo em ms).
-
-    Usa-se o passo de matching do modelo (_match_image_pair) e não o modelo completo, porque o modelo
-    completo corre o seu próprio SuperPoint numa imagem redimensionada: assim o SuperGlue recebe
-    exatamente os mesmos pontos que o SuperPoint+NN e o SuperPoint+LightGlue.
-    """
     if not f1.kps or not f2.kps:
         return [], 0.0
     device = get_device(cfg)
@@ -143,8 +117,8 @@ def match_superglue(f1: Features, f2: Features, cfg: dict):
 
     synchronize(device)
     t0 = time.perf_counter()
-    # O SuperGlue normaliza as coordenadas pelo tamanho da imagem (centro e 0,7 x lado maior), mas esta
-    # função só aceita um tamanho para as duas. Os pontos da imagem 2 são levados para o referencial da
+    # O SuperGlue normaliza as coordenadas pelo tamanho da imagem (centro e 0,7 x lado maior) 
+    # a função só aceita um tamanho para as duas. Os pontos da imagem 2 são levados para o referencial da
     # imagem 1 de forma a que a normalização dê o mesmo que com o tamanho da própria imagem 2.
     (w1, h1), (w2, h2) = r1["image_size"][0].tolist(), r2["image_size"][0].tolist()
     c1, c2 = r1["image_size"][0] / 2, r2["image_size"][0] / 2

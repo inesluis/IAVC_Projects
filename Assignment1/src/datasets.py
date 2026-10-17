@@ -11,15 +11,15 @@ class ImagePair:
     seq: str                 # nome da sequência 
     category: str            # "i" (iluminação), "v" (ponto de vista), "rot", "scale" ou "graf"
     k: float                 # nº da imagem k (HPatches, GRAF) ou nível (ângulo, fator de escala)
-    gray1: np.ndarray        # imagens em cinzento (uint8), usadas para detetar
+    gray1: np.ndarray         
     grayk: np.ndarray
     H: np.ndarray
-    bgr1: np.ndarray = None  # imagens a cores, só para as figuras
+    bgr1: np.ndarray = None   
     bgrk: np.ndarray = None
-    control: bool = False    # par trivial do teste sintético (0 graus, escala 1), fora das médias
+    control: bool = False     
 
 def imread(path) -> np.ndarray:
-    # Lê uma imagem a cores (BGR)
+    # lê uma imagem a cores (BGR)
     data = np.fromfile(str(path), dtype=np.uint8)
     img = cv2.imdecode(data, cv2.IMREAD_COLOR)
     if img is None:
@@ -27,19 +27,18 @@ def imread(path) -> np.ndarray:
     return img
 
 def imwrite(path, img) -> None:
-    # Grava uma imagem
+    # grava uma imagem
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imencode(path.suffix, img)[1].tofile(str(path))
 
 def load_image(path):
-    # Lê uma imagem e devolve (cores BGR, cinzento) 
+    # lê uma imagem e devolve (cores BGR, cinzento) 
     bgr = imread(path)
     return bgr, cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
 
 def list_sequences(root, categories, only=None) -> list[str]:
-    # Nomes das sequências HPatches das categorias pedidas, por ordem alfabética 
-    # `only` restringe a algumas sequências (para testes rápidos) 
+    # nomes das sequências HPatches das categorias pedidas, por ordem alfabética  
     root = Path(root)
     if not root.is_dir():
         raise FileNotFoundError(f"Pasta HPatches não encontrada: {root} (ver README, secção Dados)")

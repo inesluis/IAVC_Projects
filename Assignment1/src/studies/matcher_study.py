@@ -1,12 +1,3 @@
-"""Força bruta vs vizinho mais próximo aproximado (FLANN) no stitching  
-
-Com os mesmos keypoints e descritores, muda-se só a pesquisa de vizinhos; o ratio test, o cross-check
-e o RANSAC são os mesmos. Regista-se o tempo de matching, os matches, os inliers e se a homografia
-(e portanto o panorama) muda.
-  results/figures/matcher_study/<conjunto>.jpg            panoramas BF e FLANN lado a lado (método do estudo)
-  results/panoramas/matcher/<conjunto>_<método>_<bf|flann>.jpg
-"""
-
 from pathlib import Path 
 import numpy as np
 import pandas as pd 
@@ -23,20 +14,12 @@ from visualization import plot_image_grid, save_figure
 MATCHERS = {"bf": "força bruta", "flann": "FLANN"}
  
 def timed_matches(f1, f2, cfg: dict, matcher: str, repeats: int):
-    # Matches de um par e mediana do tempo de matching (ms) em várias medições, após um aquecimento 
+    # matches de um par e mediana do tempo de matching (ms) em várias medições 
     match_descriptors(f1, f2, cfg, matcher)
     runs = [match_descriptors(f1, f2, cfg, matcher) for _ in range(repeats)]
     return runs[0][0], float(np.median([t for _, t in runs]))
  
 def run_matcher_study(cfg: dict):
-    """Corre BF e FLANN nos métodos de cfg["stitching"]["matcher_study"] (só métodos com descritores:
-    o LightGlue não faz pesquisa de vizinhos). Devolve (tabela, legendas).
-
-    Uma linha por (conjunto, método, matcher, par adjacente). Colunas que comparam com a força bruta:
-      shared_with_bf   fração dos matches que também existem na força bruta (mesmo queryIdx e trainIdx)
-      corner_diff_px   distância média entre os 4 cantos da imagem projetados com a H deste matcher e
-                       com a H da força bruta (0 = mesma geometria, logo mesmo panorama)
-    """
     params = cfg["stitching"]
     study = params["matcher_study"]
     rows, captions = [], []

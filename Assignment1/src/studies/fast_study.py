@@ -37,12 +37,6 @@ def repeatability(p1, pk, H, shape1, shapek, eps: float) -> float:
     return n_corresp / min(n_vis1, n_visk)
 
 def chance_repeatability(p1, pk, H, shape1, shapek, eps: float, shifts) -> float:
-    """Repetibilidade "ao acaso": a mesma medida, mas com a homografia deslocada alguns píxeis.
-
-    Com muitos pontos, quase todos têm um vizinho a menos de eps px por coincidência. Deslocar a
-    homografia mantém os pontos e a forma como se distribuem, mas quebra a correspondência
-    verdadeira: o que ainda "repete" é coincidência. Devolve a média dos deslocamentos.
-    """
     values = []
     for dx, dy in shifts:
         shift = np.array([[1, 0, dx], [0, 1, dy], [0, 0, 1]], dtype=np.float64)
@@ -78,8 +72,7 @@ def run_fast_study(cfg: dict, only=None) -> pd.DataFrame:
             row = {"config": c["name"], "detector": c["detector"], "threshold": c["threshold"], "nms": c["nms"],
                    "seq": pair.seq, "category": pair.category, "k": pair.k,
                    "N_kps_mean": (len(kps1) + len(kpsk)) / 2, "t_det_ms": (t1 + tk) / 2}
-
-            # com pontos a mais, a contagem de correspondências pode bloquear: não se calcula  
+ 
             row["rep_skipped"] = max(len(kps1), len(kpsk)) > study["max_points_repeatability"]
             if row["rep_skipped"]:
                 row["repeatability"] = row["repeatability_chance"] = np.nan
@@ -92,16 +85,12 @@ def run_fast_study(cfg: dict, only=None) -> pd.DataFrame:
             rows.append(row)
     return pd.DataFrame(rows)
 
-def common_pairs(df: pd.DataFrame) -> pd.DataFrame:
-    """Linhas dos pares em que TODAS as configurações têm repetibilidade calculada.
-    Só assim as médias de repetibilidade são comparáveis entre configurações."""
+def common_pairs(df: pd.DataFrame) -> pd.DataFrame: 
     skipped = df[df["rep_skipped"]][["seq", "k"]].drop_duplicates()
     marked = df.merge(skipped.assign(skip=True), on=["seq", "k"], how="left")
     return df[marked["skip"].isna().to_numpy()]
 
-def summarize_fast(df: pd.DataFrame) -> pd.DataFrame:
-    """Tabela configuração x categoria.
-    Nº de pontos e tempo: média sobre todos os pares. Repetibilidade: só sobre os pares comuns."""
+def summarize_fast(df: pd.DataFrame) -> pd.DataFrame: 
     all_pairs = df.groupby(["config", "category"], sort=False)
     common = common_pairs(df).groupby(["config", "category"], sort=False)
     table = pd.DataFrame({
@@ -122,8 +111,7 @@ METRICS = {   # coluna: (nome do eixo y, eixo logarítmico?)
     "t_det_ms": ("Tempo de deteção por imagem (ms)", True),
 }
 
-def plot_fast(df: pd.DataFrame, cfg: dict, folder) -> list:
-    # Um gráfico por métrica e por categoria: valor em função do threshold, com NMS ligada e desligada, e o SIFT como linha de referência 
+def plot_fast(df: pd.DataFrame, cfg: dict, folder) -> list: 
     reference = cfg["fast_study"]["reference"]
     thresholds = cfg["fast_study"]["thresholds"]
     common = common_pairs(df)
@@ -157,8 +145,7 @@ def plot_fast(df: pd.DataFrame, cfg: dict, folder) -> list:
             captions.append((path, caption(column, category_name, reference, n_all, n_common, cfg)))
     return captions
 
-def caption(column: str, category_name: str, reference: str, n_all: int, n_common: int, cfg: dict) -> str:
-    # Legenda de um gráfico do estudo, com o que foi medido e sobre quantos pares 
+def caption(column: str, category_name: str, reference: str, n_all: int, n_common: int, cfg: dict) -> str: 
     ylabel = METRICS[column][0].split(" (")[0].lower()
     text = (f"Estudo do detetor FAST em {category_name}: {ylabel} em função do threshold de intensidade "
             f"(eixo logarítmico), com NMS ligada e desligada; linha horizontal: {reference} (valores por "

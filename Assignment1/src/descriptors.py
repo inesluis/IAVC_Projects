@@ -10,7 +10,7 @@ from interface import Features
 # Distância usada no matching: L2 nos descritores float, Hamming nos binários  
 FLOAT_DESCRIPTORS = ["SIFT", "KAZE"]
 
-# Nomes dos descritores BRIEF próprios: "BRIEF-GI", "BRIEF-GII", "BRIEF-GIII", "BRIEF-GV"
+# Nomes dos descritores BRIEF próprios 
 BRIEF_OWN_NAMES = ["BRIEF-" + s for s in STRATEGIES]
 
 def descriptor_norm(name: str) -> int:
@@ -51,19 +51,17 @@ def describe(name: str, gray, kps, cfg: dict):
         desc = desc.astype(np.float32, copy=False)
     return kps, desc, t_desc
 
-def split_method(method: str):
-    # FAST+BRIEF" -> ("FAST", "BRIEF"); "SIFT" -> ("SIFT", "SIFT") 
+def split_method(method: str): 
     if "+" in method:
         detector, descriptor = method.split("+")
     else:
-        detector = descriptor = method
-    # SIFT, ORB e KAZE dependem da escala do seu próprio detetor  
+        detector = descriptor = method  
     if descriptor in ("SIFT", "ORB", "KAZE") and descriptor != detector:
         raise ValueError(f"O descritor {descriptor} só funciona com o detetor {descriptor}")
     return detector, descriptor
 
 def extract(method: str, gray, cfg: dict) -> Features:
-    # Deteta e descreve com um método, por exemplo "SIFT" ou "FAST+FREAK" 
+    # Deteta e descreve com um método 
     # A deteção e a descrição são feitas em separado para medir os dois tempos  
     detector, descriptor = split_method(method)
     kps, t_det = detect(detector, gray, cfg)

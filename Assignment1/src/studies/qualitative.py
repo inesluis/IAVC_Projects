@@ -70,7 +70,7 @@ def run_qualitative(methods, cfg: dict) -> None:
 
     captions = keypoint_figures(methods, graf[0], cfg, folder)
 
-    for pair in graf:   # GRAF imagem 1 -> imagem 2 e imagem 1 -> imagem 3
+    for pair in graf:   
         captions += match_figures(methods, pair, pair.bgr1, pair.bgrk, "Imagem 1", f"Imagem {pair.k}",
                                   f"GRAF 1→{pair.k}", cfg, folder / f"graf_1to{pair.k}")
 

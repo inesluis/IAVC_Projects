@@ -1,12 +1,5 @@
 # BRIEF implementado, com 4 estratégias de amostragem (G I, G II, G III, G V) 
-# Segue Calonder et al., "BRIEF: Binary Robust Independent Elementary Features", ECCV 2010, secção 3.
-""" 
-Num patch S x S suavizado, centrado no keypoint, cada bit do descritor é um teste:
-
-    bit = 1 se p(x) < p(y), senão 0
-
-As estratégias diferem na escolha dos pares de píxeis (x, y) 
-"""
+# Segue Calonder et al., "BRIEF: Binary Robust Independent Elementary Features", ECCV 2010, secção 3 
 
 import cv2
 import numpy as np
@@ -14,17 +7,13 @@ STRATEGIES = ["GI", "GII", "GIII", "GV"]
 
 def polar_grid(patch_size: int, n_points: int, n_radii: int) -> np.ndarray:
     # Pontos de uma grelha polar: n_radii anéis até S/2, cada um com n_points / n_radii ângulos 
-    # O artigo só diz "; o nº de anéis é escolha nossa 
     n_angles = n_points // n_radii
     radii = (np.arange(n_radii) + 1) * (patch_size / 2) / n_radii
     angles = np.arange(n_angles) * 2 * np.pi / n_angles
     r, a = np.meshgrid(radii, angles, indexing="ij")
     return np.stack([r * np.cos(a), r * np.sin(a)], axis=-1).reshape(-1, 2)
 
-def make_pairs(strategy: str, cfg: dict) -> np.ndarray:
-    # Gera os pares de teste de uma estratégia: array (n_bits, 4) com (x1, y1, x2, y2) em píxeis relativos ao centro do patch  
-    # A seed é fixa: os mesmos pares têm de ser usados em todas as imagens, senão os descritores não são comparáveis 
-     
+def make_pairs(strategy: str, cfg: dict) -> np.ndarray:   
     p = cfg["brief_own"]
     S, n = p["patch_size"], p["n_bits"]
     half = S / 2
@@ -50,9 +39,8 @@ def make_pairs(strategy: str, cfg: dict) -> np.ndarray:
     return np.rint(pairs).astype(np.int32)
 
 def compute_brief(gray, kps, pairs: np.ndarray, cfg: dict):
-    # Calculo do descritor BRIEF dos keypoints. Devolve (keypoints mantidos, descritores).
-    # Os keypoints a menos de 28 px da borda são removidos (metade do patch + raio do kernel),
-    # como faz o BRIEF do OpenCV. Os descritores são uint8 (N, n_bits / 8).
+    # Calculo do descritor BRIEF dos keypoints. Devolve (keypoints mantidos, descritores) 
+    # Os keypoints a menos de 28 px da borda são removidos (metade do patch + raio do kernel), como faz o BRIEF do OpenCV   
      
     p = cfg["brief_own"]
     margin = p["patch_size"] // 2 + p["blur_ksize"] // 2
@@ -68,9 +56,9 @@ def compute_brief(gray, kps, pairs: np.ndarray, cfg: dict):
     # suavizar antes de comparar (float para o arredondamento não criar empates)
     smooth = cv2.GaussianBlur(gray.astype(np.float32), (p["blur_ksize"], p["blur_ksize"]), p["blur_sigma"])
 
-    # para cada keypoint (linhas) e cada par (colunas), comparar os dois píxeis
+    # comparar os dois píxeis
     x, y = pts[:, 0:1], pts[:, 1:2]
     x1, y1, x2, y2 = pairs[:, 0], pairs[:, 1], pairs[:, 2], pairs[:, 3]
     bits = smooth[y + y1, x + x1] < smooth[y + y2, x + x2]
 
-    return kps, np.packbits(bits, axis=1)   # 8 bits por byte, para usar a distância de Hamming
+    return kps, np.packbits(bits, axis=1)   # 8 bits por byte (distância de Hamming)

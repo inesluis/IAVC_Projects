@@ -26,7 +26,7 @@ def keep_strongest(kps, n_max):
 
 def detect(name: str, gray, cfg: dict):
     # Deteta keypoints numa imagem em cinzento. Devolve (keypoints, tempo em ms) 
-    # O tempo não inclui a criação do detetor 
+    # (O tempo não inclui a criação do detetor) 
     detector = create_detector(name, cfg)
     t0 = time.perf_counter()
     kps = keep_strongest(detector.detect(gray, None), cfg["max_keypoints"])

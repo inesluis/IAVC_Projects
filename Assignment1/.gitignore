@@ -16,3 +16,9 @@ __pycache__/
 # Ambientes virtuais
 venv/
 .venv/
+
+# Relatório
+report/
+
+# Documentos
+docs/

@@ -1,8 +1,8 @@
-# Documentos
-Docs/
-
 # Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Entregas
+Entregas/

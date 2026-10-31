@@ -44,7 +44,10 @@ def getModel(
     Raises:
         ValueError: If ``model_name`` is not supported.
     """
-    # os.environ["XFORMERS_DISABLED"] = "0"
+    # DINOv2 uses xformers whenever it is installed. The installed build does not
+    # match the current torch/CUDA, so use PyTorch's built-in attention instead.
+    # (DINOv2 only checks whether the variable is set, so any value disables xformers.)
+    os.environ["XFORMERS_DISABLED"] = "1"
 
     device = torch.device(device)
     if model_name == "resnet18":

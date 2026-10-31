@@ -9,7 +9,7 @@ from skimage.feature import learn_gmm
 from pathlib import Path
 
 from .features import extractFeatures
-from .utils import loadSamplesTable
+from .utils import loadSplitsTable
 
 #-------------------------------------------------------------------------------
 def sampleLocalFeatures(df, num_samples, seed=None, cache_dir=""):
@@ -85,8 +85,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Train encoders for different encoding types.")
-    parser.add_argument("--data-dir", default="data/splits",
-                        help="Directory containing dataset files.")
+    parser.add_argument("--splits-file", default="data/splits/splits.json",
+                        help="splits.json created by make_splits.py.")
     parser.add_argument("--img-dir", default="data/images",
                         help="Directory containing images.")
     parser.add_argument("--output-dir", default="data/encoders",
@@ -116,8 +116,9 @@ if __name__ == "__main__":
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     np.random.seed(args.seed)
-    df = loadSamplesTable(
-        txt_dir = args.data_dir, 
+    # Only the train subset of splits.json (never val/test) is used here.
+    df = loadSplitsTable(
+        splits_file = args.splits_file,
         img_dir = args.img_dir, 
         subset="train", 
         per_class=args.per_class, # Number of images per class; -1 uses all

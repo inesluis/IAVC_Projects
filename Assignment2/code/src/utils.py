@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import warnings
 from sklearn.exceptions import ConvergenceWarning
@@ -97,6 +98,56 @@ def loadSamplesTable(txt_dir, img_dir, subset="train", per_class=-1, random_stat
         df = df.reset_index(drop=False).drop(columns=["level_1"])
 
     return df
+
+def loadSplitsTable(splits_file, img_dir, subset="train", per_class=-1, random_state=42):
+    """
+    Load a subset from splits.json (created by code/make_splits.py).
+
+    Same output format as loadSamplesTable: one row per (image, category) with
+    columns imageset, category, filename, filepath.
+
+    Args:
+        splits_file (str or Path): Path to splits.json.
+        img_dir (str or Path): Directory with the .jpg images.
+        subset (str): "train", "val" (split from the original train) or
+            "test" (the original *_val.txt files).
+        per_class (int): -1 to use all, or number of images sampled per class
+            (same behaviour as loadSamplesTable).
+        random_state (int): Seed used when per_class > 0.
+    """
+    assert subset in ["train", "val", "test"], "subset must be 'train', 'val' or 'test'"
+    assert Path(splits_file).exists(), f"splits_file {splits_file} does not exist"
+    assert per_class == -1 or per_class > 0, "per_class must be -1 (use all) or a positive integer"
+
+    with open(splits_file, "r", encoding="utf-8") as f:
+        images = json.load(f)[subset]
+
+    file_data = [(f"{c}_{subset}", c, name)
+                 for name, classes in images.items() for c in classes]
+    df = pd.DataFrame(file_data, columns=["imageset", "category", "filename"])
+    df["filepath"] = df.filename.apply(lambda x: Path(f"{img_dir}/{x}.jpg"))
+    assert df.filepath.apply(lambda x: x.exists()).all(), "Some file paths do not exist"
+
+    if per_class > 0:
+        df["category"] = df["category"].apply(lambda x: "_background" if x == "background" else x)
+        df = df.sort_values(by="category", ascending=True)
+        df = df.drop_duplicates(subset=["filename"], keep="first")
+        df = df.groupby("category").apply(
+            lambda x: x.sample(n=min(per_class, len(x)), random_state=random_state))
+        df = df.reset_index(drop=False).drop(columns=["level_1"])
+
+    return df.sort_values(by=["category", "filename"]).reset_index(drop=True)
+
+def loadSplitsDataTables(splits_file, imgDir):
+    """Load train, val and test from splits.json into one table with a 'subset' column."""
+    dfs = []
+    for subset in ["train", "val", "test"]:
+        df = loadSplitsTable(splits_file, imgDir, subset=subset)
+        df["subset"] = subset
+        print(f"Loaded {len(df)} samples from {subset} subset.")
+        dfs.append(df)
+    df = pd.concat(dfs, ignore_index=True)
+    return df.sort_values(by=["category", "subset", "filename"]).reset_index(drop=True)
 
 def loadDataTables(dataDir, imgDir):
     df_train = loadSamplesTable(dataDir, imgDir, subset="train")

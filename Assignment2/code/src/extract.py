@@ -1,13 +1,12 @@
 import os
-from IAVC_Projects.Assignment2.code.src import utils
-from IAVC_Projects.Assignment2.code.src.encoders import ImageEncoder
+from .encoders import ImageEncoder
 from pathlib import Path
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
 import time
 from concurrent.futures import ThreadPoolExecutor
-from .utils import loadDataTables
+from .utils import loadSplitsDataTables
 
 
 ################################################################################
@@ -63,7 +62,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Extract features from images using a pre-trained encoder."
     )
-    parser.add_argument("--data-dir", default="data/splits", help="Dataset directory.")
+    parser.add_argument("--splits-file", default="data/splits/splits.json",
+                        help="splits.json created by make_splits.py.")
     parser.add_argument("--img-dir", default="data/images", help="Image directory.")
     parser.add_argument("-e","--encoder-path", default="data/encoders/bovw_K512_C0.npz",
                         help="Path to the pre-trained encoder.")
@@ -88,7 +88,8 @@ if __name__ == "__main__":
    
     args = parse_arguments()
 
-    df = loadDataTables(args.data_dir, args.img_dir)
+    # Writes <class>_train.npz, <class>_val.npz and <class>_test.npz
+    df = loadSplitsDataTables(args.splits_file, args.img_dir)
     print(df)
 
     assert args.encoder_path is not None, "Please provide a valid encoder path using --encoder-path."

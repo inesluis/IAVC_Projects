@@ -41,6 +41,14 @@ Lista das escolhas que **não vêm diretamente do enunciado** ou que **se desvia
 | 19 | **BRIEF próprio: 4 estratégias (G I, II, III, V); a G IV não foi implementada** | A G IV é a menos especificada no artigo; o enunciado pede pelo menos 2 | Acrescentar "GIV" em `brief_own.make_pairs` e em `STRATEGIES` | D25 |
 | 20 | **BRIEF próprio: coordenadas fora do patch encostadas à borda também na G II** | O artigo só o diz para a G III; com σ = S/5 cerca de 1% das coordenadas cai fora | `brief_own.make_pairs` | D25 |
 | 21 | **FAST: threshold alterado de 20 para 10 em 2026-10-12** (10 é a omissão do OpenCV) | O 20 vinha do código de arranque do guia e estava documentado, por engano, como valor por omissão. Com 10, todos os detetores usam os parâmetros por omissão | `CFG["detectors"]["FAST"]["threshold"] = 20` e repetir as corridas | D09 |
+| 22 | **SuperPoint e SIFT+LightGlue: `t_desc = 0` e `t_det` = tempo total** | A rede deteta e descreve numa só passagem; não há como separar os dois tempos | Não há alternativa sem alterar a rede; dizê-lo no relatório | D29 |
+| 23 | **LightGlue sem ratio test: o match putativo é um par com confiança ≥ 0,1** (`filter_threshold`, omissão do pacote); a "distância" do `cv2.DMatch` é 1 − confiança | O LightGlue já decide os pares (1-para-1); o ratio test só se aplica a distâncias entre descritores | `CFG["learned"]["lightglue"]["filter_threshold"]` | D31 |
+| 24 | **SuperPoint+NN usa o mesmo ratio test 0,8 + cross-check dos clássicos** (e não só o vizinho mútuo sugerido no guia) | Mesmo protocolo para todos (§2.8); a diferença para o SuperPoint+LightGlue fica a ser só o matcher | Trocar o matcher no ramo `SuperPoint+NN` de `methods.match_features` | D31 |
+| 25 | **SIFT+LightGlue usa o SIFT do pacote LightGlue (RootSIFT), não o `cv2.SIFT` da configuração clássica** | O LightGlue para SIFT foi treinado com esse extrator e esses parâmetros | `methods.extract_features` | D29, D30 |
+| 26 | **Stitching: fotografias com o lado maior acima de 1000 px são reduzidas** (as nossas de 3024×4032 passam a 750×1000) | Memória e tempo; igual para todos os métodos | `CFG["stitching"]["max_side"]` | D33 |
+| 27 | **Stitching: imagem de referência central por omissão** | É a que dá o canvas mais pequeno e a menor deformação (estudo D36) | `--ref` no `stitching.py`; `ref` em `studies/stitching_study.py` | D33, D36 |
+| 28 | **Stitching: 5 configurações (SIFT, ORB, KAZE, SuperPoint+NN, SuperPoint+LightGlue)**; FAST+X e SIFT+LightGlue ficam de fora | Um descritor float, um binário, um float de outro espaço de escalas e duas aprendidas; o enunciado pede pelo menos 3 | `CFG["stitching"]["methods"]` ou `--methods` | D33 |
+| 29 | **Estudos do limiar e da referência só com SIFT** (o rácio de inliers vs limiar inclui todos os métodos) | Panoramas lado a lado de um só método são comparáveis; o SIFT é o baseline principal (§2.2) | `CFG["stitching"]["study_method"]` | D35, D36 |
 
 ---
 
@@ -74,7 +82,8 @@ Lista das escolhas que **não vêm diretamente do enunciado** ou que **se desvia
 - **No relatório:** escrever as duas definições e reportar os denominadores em todas as tabelas.
 
 ### D03 — Uma única implementação do RANSAC
-- **Estado:** Acordada (Pessoa B, `homography.py`)
+- **Estado:** Implementada do lado da Pessoa B (`homography.estimate_homography`, 2026-10-13, ver D32);
+  falta usá-la em `evaluation.py` (P05)
 - **Decisão:** `evaluation.py` usa o `estimate_homography` de `homography.py`. Parâmetros em
   `CFG["ransac"]`: limiar 3 px, 2000 iterações, confiança 0,995.
 - **Justificação:** os inliers e o corner error da Parte 1 e o stitching da Parte 2 ficam calculados
@@ -963,6 +972,13 @@ vista, escala e rotação; nenhuma estratégia aguenta rotações de 30°.
   `python -c "import cv2; print(cv2.__version__, hasattr(cv2,'KAZE_create'))"` → `4.13.0 True`.
   Aviso a registar: o torch indica que `torch.jit.script` não é suportado em Python 3.14 (só um
   aviso por agora; a Pessoa B deve confirmar que o LightGlue corre).
+- **Ambiente da Pessoa B (verificado em 2026-10-14):** venv com Python 3.11.9, opencv-contrib-python
+  4.13.0.92 (sem `opencv-python`; `KAZE_create` e `xfeatures2d` presentes), torch 2.11.0+cu128,
+  LightGlue do GitHub (versão declarada 0.0), kornia 0.8.3, NumPy 2.4.6, SciPy 1.17.1, pandas 3.0.6,
+  Matplotlib 3.11.2. CPU AMD Ryzen 7 8700F; GPU NVIDIA GeForce RTX 5060 Ti (CUDA 12.8). O LightGlue
+  correu sem erros neste ambiente (D34, D37). Não foi testado em Python 3.14.
+- **Duas máquinas, dois ambientes:** as versões diferem entre as duas (Python, torch, NumPy, SciPy).
+  A corrida oficial faz-se numa só (D38).
 
 ### D14 — SURF não avaliado
 - **Estado:** Implementada (verificado)
@@ -986,8 +1002,11 @@ vista, escala e rotação; nenhuma estratégia aguenta rotações de 30°.
   Resolvido em 2026-10-11: implementadas 4 estratégias (G I, II, III, V), acima do mínimo de 2 do
   enunciado (D25).
 - **P02** — Que imagens usar no stitching (há `data/Panorama/keble_*.jpg` e `data/vehicle-seqs/`).
+  **Decidido por nós (2026-10-13):** `keble` e 3 fotografias nossas (`data/panorama2/`); as
+  `vehicle-seqs` não são usadas (D33). Não confirmado com o professor.
 - **P03** — HPatches completo ou subconjunto para SuperPoint/LightGlue em CPU (a GPU com CUDA
-  parece disponível no `cvc`: torch cu126).
+  parece disponível no `cvc`: torch cu126). **Proposta (2026-10-14):** HPatches completo, na GPU; os
+  aprendidos demoram minutos (D37, D38).
 - **P04** — Data de entrega, língua e limite de páginas do relatório.
 - **P05 (2026-10-08)** — ~~Métricas da homografia por implementar em `evaluation.py`~~ Resolvido em
   2026-10-15: tabela T4 implementada (D40).
@@ -1001,6 +1020,15 @@ vista, escala e rotação; nenhuma estratégia aguenta rotações de 30°.
   simplificação~~ Feito no mesmo dia: os resultados atuais estão na D28 e em `results/`. Os números das
   configurações FAST+X nas entradas D22, D23, D25 e D26 são da versão com t = 20 e ficam como registo
   histórico. **Falta a corrida oficial**, com os métodos da Pessoa B e a T4, e com os cuidados de
-  medição de tempos descritos na D28.
+  medição de tempos descritos na D28. Plano proposto na D38.
+- **P11 (2026-10-14)** — **HPatches no PC da Inês com a pasta repetida**
+  (`data/hpatches-sequences-release/hpatches-sequences-release/<seq>/`): a avaliação não encontra
+  nenhuma sequência e o `--part1` falha com `KeyError: 'control'` (tabela vazia). Se a corrida oficial
+  for nessa máquina, subir a pasta interior um nível antes (D04).
+- **P12 (2026-10-14)** — ~~Força bruta vs vizinho aproximado no stitching por fazer~~ Feito em
+  2026-10-15 (D39): SIFT, KAZE e ORB nos dois conjuntos, dentro do `--part2`.
+- **P13 (2026-10-14)** — `tests/test_sanity.py` não cobre os métodos aprendidos, a homografia nem o
+  stitching. As verificações da secção 3 do VERIFICACOES.md foram feitas com scripts à parte; passá-las
+  para o teste é opcional.
 - **P08 (2026-10-08)** — ~~Análise qualitativa GRAF~~ feita (D21). Falta decidir se as figuras
   (30 JPEG, ≈ 13 MB) vão para o git ou se se geram só para a entrega.

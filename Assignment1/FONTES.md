@@ -1,7 +1,7 @@
 # Fontes — Assignment #1
 
 Registo das fontes em que o trabalho se baseia, para a bibliografia do relatório. Atualizado em
-12 de outubro de 2026.
+12 de outubro de 2026; parte da Pessoa B acrescentada em 14 de outubro de 2026.
 
 Cada fonte tem um **estado**:
 
@@ -46,9 +46,9 @@ As referências dos artigos estão escritas como no enunciado (secção 10), exc
 | V. Balntas, K. Lenc, A. Vedaldi, K. Mikolajczyk, "HPatches: A Benchmark and Evaluation of Handcrafted and Learned Local Descriptors," CVPR 2017 | Dataset HPatches |
 | H. Bay, A. Ess, T. Tuytelaars, L. Van Gool, "SURF: Speeded Up Robust Features," CVIU, 110(3), pp. 346–359, 2008 | SURF: não avaliado (indisponível no OpenCV instalado, D14); citar ao justificar |
 | R. Szeliski, "Computer Vision: Algorithms and Applications," 2.ª ed., Springer, 2022 | Referência geral (RANSAC, homografias, stitching) |
-| D. DeTone, T. Malisiewicz, A. Rabinovich, "SuperPoint: Self-Supervised Interest Point Detection and Description," CVPR Workshops, 2018 | Parte da Pessoa B |
-| P. Sarlin, D. DeTone, T. Malisiewicz, A. Rabinovich, "SuperGlue: Learning Feature Matching with Graph Neural Networks," CVPR 2020 | Parte da Pessoa B |
-| P. Lindenberger, P.-E. Sarlin, M. Pollefeys, "LightGlue: Local Feature Matching at Light Speed," ICCV 2023 *(não está na lista do enunciado; indicada no guia)* | Parte da Pessoa B |
+| D. DeTone, T. Malisiewicz, A. Rabinovich, "SuperPoint: Self-Supervised Interest Point Detection and Description," CVPR Workshops, 2018 | SuperPoint (detetor + descritor) nas configurações SuperPoint+NN e SuperPoint+LightGlue; pesos `superpoint_v1.pth` (D29) |
+| P. Sarlin, D. DeTone, T. Malisiewicz, A. Rabinovich, "SuperGlue: Learning Feature Matching with Graph Neural Networks," CVPR 2020 | Não avaliado (não está na lista mínima do §4); citar ao descrever os matchers aprendidos e como antecessor do LightGlue |
+| P. Lindenberger, P.-E. Sarlin, M. Pollefeys, "LightGlue: Local Feature Matching at Light Speed," ICCV 2023 *(não está na lista do enunciado; indicada no guia)* | Matcher LightGlue e implementação usada (pacote cvg/LightGlue); pesos `superpoint_lightglue` e `sift_lightglue` (D29–D31) |
 
 ### 2.3 Referências que provavelmente fazem falta (escritas de memória; confirmar antes de usar)
 
@@ -56,6 +56,8 @@ As referências dos artigos estão escritas como no enunciado (secção 10), exc
 |---|---|
 | K. Mikolajczyk, T. Tuytelaars, C. Schmid, A. Zisserman, J. Matas, F. Schaffalitzky, T. Kadir, L. Van Gool, "A Comparison of Affine Region Detectors," IJCV, 65, pp. 43–72, 2005 | Origem das sequências GRAF (e de `v_bark`, `v_boat`, `v_wall`, `v_graffiti`); definição clássica de repetibilidade |
 | C. Schmid, R. Mohr, C. Bauckhage, "Evaluation of Interest Point Detectors," IJCV, 37(2), pp. 151–172, 2000 | Definição de repetibilidade de detetores |
+| M. A. Fischler, R. C. Bolles, "Random Sample Consensus: A Paradigm for Model Fitting with Applications to Image Analysis and Automated Cartography," Communications of the ACM, 24(6), pp. 381–395, 1981 | Artigo original do RANSAC; o relatório tem de explicar o princípio (§3.2, D32) |
+| R. Hartley, A. Zisserman, "Multiple View Geometry in Computer Vision," 2.ª ed., Cambridge University Press, 2004 | Homografias (8 graus de liberdade, 4 correspondências) e estimação robusta; alternativa ou complemento ao Szeliski |
 
 ## 3. Documentação técnica
 
@@ -75,7 +77,14 @@ instalada (VERIFICACOES.md, secção 2.2).
 | OpenCV, cv::Feature2D Class Reference | https://docs.opencv.org/3.4/d0/d13/classcv_1_1Feature2D.html | Interface comum `detect` / `compute` |
 | OpenCV 4.x, namespace cv::xfeatures2d | https://docs.opencv.org/4.x/d3/df6/namespacecv_1_1xfeatures2d.html | Módulo contrib (BRIEF, FREAK, SURF) |
 
-Por confirmar (endereços não verificados): páginas de `cv::ORB`, `cv::KAZE` e `cv::BRISK` em
+Software dos métodos aprendidos:
+
+| Fonte | Endereço | Confirmado |
+|---|---|---|
+| Repositório cvg/LightGlue (código e pesos, release `v0.1_arxiv`) | https://github.com/cvg/LightGlue | Código do pacote instalado lido em 2026-10-14: `default_conf` do SuperPoint, do SIFT e do LightGlue (D30); keypoints do SuperPoint em píxeis inteiros (`superpoint.py`, linha 210); nomes dos ficheiros de pesos na cache |
+
+Por confirmar (endereços não verificados): páginas de `cv::findHomography` e `cv::warpPerspective`
+em docs.opencv.org (usadas na Parte 2); páginas de `cv::ORB`, `cv::KAZE` e `cv::BRISK` em
 docs.opencv.org; páginas do SciPy para `scipy.spatial.cKDTree.sparse_distance_matrix` e
 `scipy.sparse.csgraph.maximum_bipartite_matching` (usadas nas correspondências ground-truth, D17 e D24).
 
@@ -85,7 +94,10 @@ docs.opencv.org; páginas do SciPy para `scipy.spatial.cKDTree.sparse_distance_m
 |---|---|---|
 | HPatches, "hpatches-sequences-release" (116 sequências: 57 `i_*`, 59 `v_*`) | https://huggingface.co/datasets/vbalnt/hpatches/resolve/main/hpatches-sequences-release.zip (endereço indicado no guia); artigo de Balntas et al., CVPR 2017 | Avaliação quantitativa (iluminação e ponto de vista) |
 | GRAF: `img1.ppm`, `img2.ppm`, `img4.ppm`, `H1to2p.txt`, `H1to4p.txt` | Material da cadeira (conjunto de Oxford; ver 2.3) | Teste sintético de rotação/escala, figuras qualitativas, métricas por par |
-| Panorama: `keble_a.jpg`, `keble_b.jpg`, `keble_c.jpg`; `vehicle-seqs/` | Material da cadeira | Parte 2 (Pessoa B) |
+| Panorama: `keble_a.jpg`, `keble_b.jpg`, `keble_c.jpg` (720×568) | Material da cadeira | Parte 2: conjunto `keble` (D33) |
+| `vehicle-seqs/` | Material da cadeira | Não usado |
+| Panorama próprio: `img1.jpg`, `img2.jpg`, `img3.jpg` (3024×4032, reduzidas a 750×1000) em `data/panorama2/` | Fotografias nossas | Parte 2: conjunto `proprio` (D33) |
+| Pesos pré-treinados: `superpoint_v1.pth`, `superpoint_lightglue_v0-1_arxiv.pth`, `sift_lightglue_v0-1_arxiv.pth` | Descarregados pelo pacote cvg/LightGlue (release `v0.1_arxiv`; o SuperPoint é da Magic Leap) | Métodos aprendidos; não vão na entrega (D15) |
 
 ## 5. Software
 
@@ -97,8 +109,23 @@ docs.opencv.org; páginas do SciPy para `scipy.spatial.cKDTree.sparse_distance_m
 | SciPy | 1.18.1 | |
 | Matplotlib | 3.11.2 | |
 | pandas | 3.0.6 | |
-| PyTorch | 2.14.1+cu126 | Parte da Pessoa B |
+| PyTorch | 2.14.1+cu126 | Instalado no `cvc`; os métodos aprendidos não foram corridos neste ambiente |
 | CPU | Intel Core i7-12650H (16 threads) | Indicar junto aos tempos |
+
+Ambiente da Pessoa B (PC onde correram a Parte 2 e o teste da D37):
+
+| Software / hardware | Versão | Notas |
+|---|---|---|
+| Python | 3.11.9 (venv) | |
+| opencv-contrib-python | 4.13.0.92 | Sem `opencv-python` |
+| PyTorch | 2.11.0+cu128 | CUDA 12.8 |
+| LightGlue | GitHub cvg/LightGlue (versão declarada 0.0) | Pesos `v0.1_arxiv` |
+| kornia | 0.8.3 | Dependência do LightGlue |
+| NumPy / SciPy / pandas / Matplotlib | 2.4.6 / 1.17.1 / 3.0.6 / 3.11.2 | |
+| CPU | AMD Ryzen 7 8700F (8 núcleos) | |
+| GPU | NVIDIA GeForce RTX 5060 Ti | Usada pelos métodos aprendidos (`CFG["learned"]["device"] = None`) |
+
+Os dois ambientes têm versões diferentes; a corrida oficial faz-se num só (D38).
 
 ## 6. Ferramentas de IA
 
@@ -121,3 +148,7 @@ consistentes com o que se mediu, mas não foram lidas nos artigos durante este t
 | O `maximum_bipartite_matching` do SciPy usa o algoritmo de Hopcroft–Karp | D24 | Documentação do SciPy |
 | O BRIEF do OpenCV usa filtro de caixa com imagens integrais, patch 48 e kernel 9 | D25 | Código-fonte do OpenCV (`brief.cpp`). Medido: margem de 28 px = 48/2 + 9/2 |
 | As sequências GRAF, `v_bark`, `v_boat` vêm do conjunto de Oxford (zoom + rotação, ponto de vista) | D19 | Mikolajczyk et al. (IJCV 2005) |
+| O SuperPoint é treinado por adaptação homográfica e não é invariante a rotações grandes | D37 | DeTone et al. (CVPRW 2018). Medido: precisão ≤ 0,06 a partir de 60° com LightGlue (D37); a causa no treino falta confirmar no artigo |
+| O LightGlue pára mais cedo (`depth_confidence`) e descarta pontos sem par (`width_confidence`) nos pares fáceis | D30 | Lindenberger et al. (ICCV 2023); o enunciado (§2.6) descreve o mesmo |
+| O RANSAC do `cv2.findHomography` ajusta o nº de iterações à proporção de inliers e à confiança (até `maxIters`) e, no fim, reestima H com todos os inliers | D32 | Documentação de `cv::findHomography`; Fischler & Bolles (1981) para o princípio |
+| O ORB não refina a posição dos keypoints ao sub-píxel | D34 | Código do OpenCV (`orb.cpp`). Medido: só 26% das coordenadas inteiras (as do nível 0); as restantes são posições de níveis reduzidos da pirâmide |

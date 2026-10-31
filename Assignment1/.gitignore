@@ -1,6 +1,9 @@
 # Datasets (HPatches, GRAF, panoramas) — nunca fazer commit
 data/
 
+# Resultados
+results/
+
 # Python
 __pycache__/
 
@@ -13,3 +16,9 @@ __pycache__/
 # Ambientes virtuais
 venv/
 .venv/
+
+# Relatório
+report/
+
+# Documentos
+docs/

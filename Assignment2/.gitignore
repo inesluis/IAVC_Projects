@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+
+# Pesos de redes
+*.pth
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Ambientes virtuais
+venv/
+.venv/
+
+# Documentos
+docs/
+
+# Datasets
+data/
+
+# Resultados
+results/
+
+# Relatório
+report/

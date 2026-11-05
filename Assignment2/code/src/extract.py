@@ -1,5 +1,6 @@
 import os
-from .encoders import ImageEncoder
+from src import utils
+from src.encoders import ImageEncoder
 from pathlib import Path
 from tqdm import tqdm
 import pandas as pd

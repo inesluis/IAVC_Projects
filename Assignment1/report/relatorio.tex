@@ -1,13 +1,7 @@
 % ============================================================================
-%  Relatório do Assignment #1 — IAVC 2026/27
-%  Ficheiro único. Compilar com pdfLaTeX (Overleaf: Menu > Compiler > pdfLaTeX).
+%  Relatório do Assignment #1 — IAVC 2026/27 
 %
-%  FIGURAS: carregar a pasta results/figures do projeto para o Overleaf com o
-%  nome "figuras", e a pasta results/panoramas com o nome "panoramas".
-%  Enquanto uma figura não existir, aparece uma caixa no lugar.
 %  LOGÓTIPO: carregar o logótipo da UC como "uc_logo.png" (opcional).
-%  NOTAS: as caixas cinzentas "\nota{...}" dizem o que falta escrever. Para as
-%  esconder todas de uma vez, trocar a definição de \nota mais abaixo.
 % ============================================================================
 \documentclass[11pt,a4paper]{article}
 
@@ -102,31 +96,44 @@
 \section{Introdução}
 % Enunciado §9a: 0,75 a 1 página.
 % ============================================================================
-\nota{(Carolina) O problema: encontrar pontos de interesse numa imagem e descrevê-los de forma a
-reconhecê-los noutra imagem da mesma cena. Importância e aplicações (panoramas, localização visual,
-SLAM, structure-from-motion). Objetivos do trabalho: comparar, com números, métodos clássicos e
-aprendidos, e usá-los para construir panoramas. Terminar com a organização do relatório, secção a secção.}
+O problema da deteção de \textit{keypoints} e de descritores destaca-se no desafio em reconhecer o mesmo ponto físico de uma cena em diferentes imagens sob variações. Este processo efetua-se em três passos: um \textbf{detetor}, um \textbf{descritor} e um \textbf{matcher}. A dificuldade está em que as imagens variam em iluminação, escala, ponto de vista e rotação. Um bom ponto tem de ser \textbf{repetível}, isto é, o detetor tem de cumprir a tarefa de o voltar a encontrar na outra imagem considerada e o seu descritor tem de ser \textbf{distintivo} para não ser confundido com outro.
 
+Este assunto evidencia a sua importância e as variadíssimas \textbf{aplicações} tais como panoramas, localização visual, reconstrução 3D, entre outras. Com toda a evolução destacada surgiram dois grupos de métodos: os \textbf{clássicos}, como o SIFT~\cite{lowe2004}, o ORB~\cite{rublee2011}, o KAZE~\cite{alcantarilla2012} ou o FAST~\cite{rosten2006} combinado com descritores binários. E ainda tem-se os \textbf{aprendidos}, como o SuperPoint~\cite{detone2018} e os \textit{matchers} SuperGlue~\cite{sarlin2020} e LightGlue~\cite{lindenberger2023}.
+
+Este trabalho assentou em vários \textbf{objetivos} tais como: comparar quantitativamente métodos clássicos e aprendidos no benchmark HPatches~\cite{balntas2017}, distinguindo condições de iluminação e ponto de vista. Avaliou-se a robustez à rotação e à escala, estudou-se os parâmetros do detetor FAST e ainda implementou-se um descritor BRIEF com quatro estratégias de amostragem. Avaliou-se também a homografia estimada com RANSAC e, numa segunda parte analisou-se num pipeline de stitching próprio, o efeito do limiar do RANSAC, da escolha da imagem de referência e da pesquisa por força bruta ou aproximada. Por fim, isolou-se o contributo dos \textit{matchers}, comparando três opções com o mesmo detetor e descritor (SuperPoint).
+
+A Secção~2 apresenta os métodos avaliados e a Secção~3 descreve a metodologia experimental. As Secções~4 e~5 apresentam e discutem os resultados da avaliação dos métodos e do \textit{stitching}, respetivamente. Por fim, a Secção~6 apresenta as conclusões.
 % ============================================================================
-\section{Métodos}
-% Enunciado §9b: 3 a 5 páginas. Ideia principal de cada método, vantagens,
-% desvantagens e custo esperado. NÃO reproduzir detalhes de implementação dos artigos.
-% Distinguir sempre detetor, descritor e matcher (enunciado §4).
+\section{Métodos} 
 % ============================================================================
 
-\subsection{Detetores e descritores clássicos}
-\nota{(Carolina) Um parágrafo curto por método, com a ideia principal, o ponto forte e o ponto fraco:
-SIFT~\cite{lowe2004}; FAST~\cite{rosten2006,rosten2010}; KAZE~\cite{alcantarilla2012}; ORB~\cite{rublee2011};
-BRIEF~\cite{calonder2010,calonder2012}; BRISK~\cite{leutenegger2011}; FREAK~\cite{alahi2012}.
-SURF~\cite{bay2008} não foi avaliado: não está disponível no OpenCV instalado (algoritmo \emph{non-free}).
-Ler as secções relevantes de cada artigo antes de escrever (ver FONTES.md).}
+\subsection{Detetores e descritores clássicos} 
+
+\begin{itemize}
+
+\item \textbf{SIFT~\cite{lowe2004}:} deteta pontos como extremos de diferenças de gaussianas numa pirâmide de escalas e atribui a cada um uma orientação dominante, descrevendo a vizinhança por histogramas de gradientes. É invariante à escala e à rotação e muito distintivo, mas tem um custo computacional elevado.
+
+\item \textbf{FAST~\cite{rosten2006}:} identifica cantos através de diferenças de intensidade entre píxeis vizinhos, sendo notavelmente rápido. Não produz descritor nem trata a escala ou a orientação. O número de pontos detetados depende do \textit{threshold}.
+
+\item \textbf{KAZE~\cite{alcantarilla2012}:} aplica difusão não linear para construir um espaço de escalas que procura preservar as arestas. Esta abordagem favorece a localização e a distintividade dos pontos, no entanto apresenta um custo computacional elevado.
+
+\item \textbf{ORB~\cite{rublee2011}:} combina FAST com uma pirâmide de imagens e uma versão orientada do BRIEF. Gera descritores binários de 256 bits, compactos e rápidos de comparar, permitindo robustez à rotação e à escala, embora possa ser menos resistente a alterações significativas do ponto de vista.
+
+\item \textbf{BRIEF~\cite{calonder2010}:} descreve cada ponto através de comparações de intensidade entre pares de píxeis, produzindo um descritor binário de 256 bits. É rápido e compacto, porém sensível à rotação e à escala. Neste trabalho avaliou-se quatro estratégias de amostragem.
+
+\item \textbf{BRISK~\cite{leutenegger2011}:} utiliza um padrão de amostragem em anéis e produz descritores binários de 512 bits, estimando a orientação para melhorar a robustez à rotação. Face ao BRIEF, requer mais memória. Neste trabalho, utiliza-se o descritor sobre pontos detetados pelo FAST, sem deteção multiescala.
+
+\item \textbf{FREAK~\cite{alahi2012}:} inspira-se na distribuição dos recetores da retina, com amostragem mais densa no centro e mais espaçada na periferia. Produz descritores binários de 512 bits e estima a orientação, procurando conciliar eficiência e robustez. A invariância à escala depende do detetor utilizado.
+
+\end{itemize}
+
+SIFT e KAZE utilizam descritores em vírgula flutuante, comparados pela distância L2 em contrapartida com ORB, BRIEF, BRISK e FREAK que recorrem a descritores binários comparados pela distância de Hamming. 
 
 A Tabela~\ref{tab:metodos} resume as propriedades dos métodos avaliados.
 
 \begin{table}[H]
 \centering\small
-\caption{Métodos clássicos avaliados. A dimensão e os bytes por descritor foram confirmados na versão
-do OpenCV usada (4.13.0). As colunas de invariância resumem o desenho de cada método.}
+\caption{Métodos clássicos avaliados. A dimensão e os \textit{bytes} por descritor foram confirmados na versão do OpenCV usada (4.13.0).}
 \label{tab:metodos}
 \begin{tabular}{lllrrl}
 \toprule
@@ -137,20 +144,23 @@ KAZE  & detetor + descritor & vírgula flutuante & 64 & 256 & L2 \\
 ORB   & detetor + descritor & binário & 256 bits & 32 & Hamming \\
 FAST  & só detetor & --- & --- & --- & --- \\
 BRIEF & só descritor & binário & 256 bits & 32 & Hamming \\
-BRISK & descritor (usado com FAST) & binário & 512 bits & 64 & Hamming \\
-FREAK & só descritor & binário & 512 bits & 64 & Hamming \\
+BRISK & só descritor (com FAST) & binário & 512 bits & 64 & Hamming \\
+FREAK & só descritor (com FAST) & binário & 512 bits & 64 & Hamming \\
 \bottomrule
 \end{tabular}
-\end{table}
-
-\nota{(Carolina) Acrescentar à tabela, ou em texto, as invariâncias de cada método (escala, rotação),
-depois de confirmadas nos artigos.}
+\end{table} 
 
 \subsection{BRIEF implementado}
-\nota{(Carolina) O que é o teste binário do BRIEF e porque se suaviza a imagem antes. As quatro
-estratégias de amostragem implementadas (G~I, G~II, G~III e G~V do artigo original~\cite{calonder2010})
-e o que as distingue. Dizer o que o artigo não especifica e o que escolhemos: tamanho do patch (48\px),
-grelha polar da G~V (8 anéis $\times$ 32 ângulos). A G~IV não foi implementada. Ver VERIFICACOES.md, secção 1.}
+O BRIEF descreve cada ponto através de 256 comparações de intensidade num patch $S\times S$ centrado nele: para cada par de píxeis $(x_i, y_i)$, o bit $i$ é 1 se $I(x_i) < I(y_i)$ e 0 caso contrário. Obtém-se um descritor de 32 \textit{bytes}, comparado com a distância de Hamming. Estes testes são sensíveis ao ruído e por isso a imagem é suavizada antes com um filtro gaussiano $9\times9$ e $\sigma = 2$, os valores do artigo original~\cite{calonder2010}. A escolha do método foca-se na estratégia de amostragem dos pares de píxeis. Implementou-se quatro das cinco estratégias do artigo, com a origem no centro do patch (Figura~\ref{fig:brief-padroes}):
+\begin{itemize}
+  \item \textbf{G~I}: $x$ e $y$ uniformes em todo o patch (pares longos);
+  \item \textbf{G~II}: $x$ e $y$ gaussianos centrados no patch, com variância $S^2/25$ (a estratégia
+  usada pelos autores);
+  \item \textbf{G~III}: $x$ gaussiano como na G~II e $y$ gaussiano à volta de $x$, com variância
+  $S^2/100$ (pares curtos);
+  \item \textbf{G~V}: $x$ sempre no centro e $y$ nos pontos de uma grelha polar (padrão
+  determinístico).
+\end{itemize}
 
 \begin{figure}[H]
 \centering
@@ -163,22 +173,57 @@ liga os dois píxeis comparados num teste (256 testes, patch de $48\times48$\px,
 \label{fig:brief-padroes}
 \end{figure}
 
-\subsection{Métodos aprendidos}
-\nota{(Inês) SuperPoint~\cite{detone2018}: detetor e descritor numa só rede. LightGlue~\cite{lindenberger2023}
-e SuperGlue~\cite{sarlin2020}: são \emph{matchers}, não detetores. Implementação e pesos usados:
-SuperPoint e LightGlue do pacote \texttt{cvg/LightGlue}; SuperGlue do \texttt{transformers}, alimentado com
-os keypoints e descritores do mesmo SuperPoint, para que SuperPoint+NN, +SuperGlue e +LightGlue difiram
-só no matcher (DECISOES.md, D42).}
+As escolhas de implementação não especificadas no artigo foram:
 
-\subsection{Emparelhamento, RANSAC e homografia}
-\nota{(Inês, com a parte do matching da Carolina) Ratio test e cross-check. Princípio do RANSAC e papel
-do limiar (o enunciado, §3.2, exige esta explicação). Composição de homografias e acumulação de erro
-(§3.3). Referência geral: \cite{szeliski2022}.}
+\begin{itemize} 
+\item \textbf{Tamanho do patch:} \textbf{Patch $S = 48$\px}, seguindo o BRIEF do OpenCV para facilitar a comparação direta e manter os mesmos pontos válidos junto às bordas. 
+\item \textbf{Grelha polar da G~V:} 8 anéis e 32 ângulos, totalizando 256 testes. 
+\item \textbf{Amostragem:} pares fixos em todas as imagens com semente aleatória fixa garantindo a comparabilidade dos descritores. \end{itemize}
+Tal como o original, este BRIEF não tem orientação nem escala.
+
+\subsection{Métodos aprendidos} % learned.py
+
+\begin{itemize}
+
+\item \textbf{SuperPoint~\cite{detone2018}:} rede convolucional que deteta pontos e calcula descritores de 256 dimensões em simultâneo, a partir de um \textit{encoder} partilhado. É treinada de forma auto-supervisionada, o que lhe confere robustez a mudanças de ponto de vista e de iluminação.
+
+\item \textbf{SuperGlue~\cite{sarlin2020}:} estabelece correspondências entre pontos já detetados, através de uma rede neuronal com mecanismos de atenção que considera o contexto de ambas as imagens. Recorre a transporte ótimo, o que permite rejeitar pontos sem par. É robusto a grandes alterações de ponto de vista, mas computacionalmente pesado.
+
+\item \textbf{LightGlue~\cite{lindenberger2023}:} sucessor do SuperGlue, adapta o esforço à dificuldade de cada par de imagens, terminando mais cedo e descartando pontos sem par provável. É mais rápido e fácil de treinar, mantendo ou superando a precisão do SuperGlue.
+
+\end{itemize}
+
+Para separar o desempenho do detetor/descritor do desempenho do \textit{matcher}, as três configurações baseadas no SuperPoint usam os mesmos pontos e descritores e diferem apenas no \textit{matcher}: SuperPoint+NN, com o mesmo \textit{matcher} dos métodos clássicos (ratio test e cross-check), SuperPoint+SuperGlue e SuperPoint+LightGlue. No SuperGlue, implementado na biblioteca \texttt{transformers}, usámos apenas o passo de \textit{matching}, para que receba os pontos deste SuperPoint. Avaliámos ainda o SIFT+LightGlue, com o SIFT do pacote do LightGlue. Este difere do SIFT do OpenCV (usa RootSIFT), por isso a comparação com o SIFT clássico mistura diferenças de extrator e de \textit{matcher}.
+
+A Tabela~\ref{tab:aprendidos} resume as propriedades dos métodos aprendidos. Os descritores são \texttt{float32} (4 bytes por dimensão).
+
+\begin{table}[H]
+\centering\small
+\caption{Métodos aprendidos avaliados}
+\label{tab:aprendidos}
+\begin{tabular}{lllrrl}
+\toprule
+Método & Papel & Tipo de descritor & Dimensão & Bytes & Critério de \textit{match} \\
+\midrule
+SuperPoint       & detetor + descritor & vírgula flutuante & 256 & 1024 & L2 (com NN) \\
+SIFT (LightGlue) & detetor + descritor & vírgula flutuante & 128 & 512 & --- \\
+SuperGlue        & só \textit{matcher} & --- & --- & --- & confiança $\geq 0{,}2$ \\
+LightGlue        & só \textit{matcher} & --- & --- & --- & confiança $\geq 0{,}1$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Emparelhamento, RANSAC e homografia} % matching.py, homography.py, config.py
+\label{sec:emparelhamento}
+
+Nos métodos baseados em descritores, as correspondências entre imagens são estabelecidas através da comparação dos descritores, usando a distância L2 ou de Hamming consoante o tipo de descritor. Considerou-se a pesquisa por força bruta e a pesquisa aproximada através de FLANN. Para reduzir correspondências incorretas aplicam-se filtros como o \textit{ratio test} que elimina os casos ambíguos e o \textit{cross-check} que garante correspondências um-para-um. Nos \textit{matchers} aprendidos, estes filtros são substituídos pela confiança atribuída pela rede a cada par.
+
+Uma homografia é uma transformação projetiva entre dois planos, representada por uma matriz $3\times3$ com 8 graus de liberdade, pelo que bastam quatro correspondências para a calcular. Relaciona exatamente duas imagens de uma cena plana ou de uma cena qualquer captada por uma câmara que apenas roda em torno do centro ótico, caso que justifica o seu uso em panoramas. Como os \textit{matches} incluem pares errados, a homografia é estimada com RANSAC: escolhem-se repetidamente quatro \textit{matches} ao acaso, calcula-se a homografia correspondente e contam-se os \textit{inliers}, isto é, os \textit{matches} com erro de reprojeção abaixo de um limiar. A hipótese com mais \textit{inliers} é depois reestimada com todos eles. Um limiar demasiado pequeno rejeita \textit{matches} corretos, devido ao ruído na posição dos pontos, enquanto um demasiado grande aceita \textit{matches} errados, degradando a homografia final.
+
+Num panorama com mais de duas imagens, só se estima a homografia entre imagens adjacentes, porque são estas que têm sobreposição suficiente. Para levar todas as imagens para o plano de uma imagem de referência, compõem-se as homografias ao longo da cadeia. Uma imagem à esquerda da referência é transformada pelo produto das homografias até à referência e uma imagem à direita pelo produto das respetivas inversas. Cada homografia estimada tem um pequeno erro e cada multiplicação junta o erro de mais uma. Por isso, quanto mais longe da referência estiver uma imagem, maior é o erro acumulado. Com três imagens, a imagem central como referência exige uma só homografia por imagem, enquanto escolher uma ponta como referência obriga a compor duas homografias para a ponta oposta.
 
 % ============================================================================
-\section{Setup experimental}
-% Enunciado §9c: datasets, protocolo, parâmetros e ambiente.
-% O texto desta secção é um rascunho factual: rever e adaptar.
+\section{Setup experimental} 
 % ============================================================================
 
 \subsection{Dados}
@@ -187,40 +232,31 @@ do limiar (o enunciado, §3.2, exige esta explicação). Composição de homogra
   uma com as homografias verdadeiras da imagem 1 para as restantes. 57 sequências têm variação de
   iluminação (\texttt{i\_*}) e 59 têm variação de ponto de vista (\texttt{v\_*}). Usámos todos os pares
   $1\to k$, $k=2,\dots,6$: 285 pares de iluminação e 295 de ponto de vista.
-  \item \textbf{Teste sintético de rotação e escala.} O HPatches não separa a rotação nem a escala das
-  restantes mudanças de ponto de vista. Para avaliar cada fator isolado, rodámos e escalámos a imagem~1
+  \item \textbf{Teste sintético de rotação e escala.} Para avaliar cada fator isolado, rodámos e escalámos a imagem~1
   do conjunto GRAF com transformações conhecidas, que servem de homografia verdadeira: 12 rotações de
   15\textdegree{} a 180\textdegree{} e 9 fatores de escala entre 0,5 e 2.
-  \item \textbf{GRAF}: três imagens da mesma cena com mudança de ponto de vista crescente (imagens 1, 2 e 3),
-  usadas na análise qualitativa.
+  \item \textbf{GRAF}: três imagens da mesma cena com mudança de ponto de vista crescente (imagens 1, 2 e 3), foram aplicadas na análise qualitativa.
   \item \textbf{Panoramas}: o conjunto \emph{keble} (três imagens fornecidas) e três sequências próprias
-  de três fotografias cada (\emph{proprio1} a \emph{proprio3}). As fotografias com o lado maior acima de
-  1000\px{} são reduzidas antes do processamento.
-  \nota{(Inês) Descrever as sequências próprias: onde foram tiradas, com que câmara, que movimento.}
+  de três fotografias cada, tiradas com um telemóvel em orientação vertical, rodando a câmara à mão, com sobreposição de fotografias consecutivas: um edifício térreo visto de cima (\emph{proprio1}), uma vista urbana com uma igreja e uma encosta ao fundo (\emph{proprio2}) e um conjunto de prédios (\emph{proprio3}). As fotografias com o lado maior acima de 1000\px{} foram reduzidas antes do processamento.
 \end{itemize}
 
 \subsection{Protocolo e métricas}
-Todos os métodos foram avaliados com o mesmo protocolo, o de referência do enunciado:
+Todos os métodos foram avaliados com o mesmo protocolo, o de referência do enunciado~\cite{assignment1}:
 \begin{itemize}
-  \item \textbf{Emparelhamento}: vizinho mais próximo por força bruta, com ratio test (limiar 0,8) e
-  cross-check, o que dá correspondências um-para-um. Distância de Hamming nos descritores binários e L2
-  nos de vírgula flutuante.
-  \item \textbf{Correção de um match}: um match $(p_1, p_k)$ é correto se $\lVert H p_1 - p_k\rVert < 3$\px,
-  com $H$ a homografia verdadeira.
-  \item \textbf{Limite de pontos}: no máximo 2000 keypoints por imagem em todos os métodos, escolhendo os
-  de maior resposta, para a comparação não depender do número de pontos detetados.
-  \item \textbf{Parâmetros}: valores por omissão do OpenCV em todos os detetores e descritores; a única
-  alteração é o limite de pontos (no ORB, através de \texttt{nfeatures}).
+  \item \textbf{Emparelhamento}: força bruta com ratio test (limiar 0,8) e cross-check (Secção~\ref{sec:emparelhamento}).
+  \item \textbf{Correção de um match}: um match $(p_1, p_k)$ é correto se $\lVert H p_1 - p_k\rVert < 3$\px, com $H$ a homografia verdadeira.
+  \item \textbf{Limite de pontos}: no máximo 2000 keypoints por imagem em todos os métodos, escolhendo os de maior resposta para a comparação não depender do número de pontos detetados.
+  \item \textbf{Parâmetros}: valores por omissão do OpenCV em todos os detetores e descritores. A única alteração é o limite de pontos (no ORB, através de \texttt{nfeatures}).
 \end{itemize}
 
-Para cada método e cada par calculámos as quatro métricas do enunciado~\cite{heinly2012}:
-\begin{align*}
-\text{PMR} &= \frac{N_\text{putative}}{N_\text{features}}, &
-\text{Precisão} &= \frac{N_\text{correct}}{N_\text{putative}}, \\[4pt]
-\text{Matching score} &= \frac{N_\text{correct}}{N_\text{features}}, &
-\text{Recall} &= \frac{N_\text{correct}}{N_\text{correspondences}}.
-\end{align*}
-Os denominadores foram definidos assim:
+Para cada método e cada par calculámos as quatro métricas (Putative Match Ratio, Precision, Matching Score, Recall) do enunciado~\cite{heinly2012} com 
+%\begin{align*}
+%\text{PMR} &= \frac{N_\text{putative}}{N_\text{features}}, &
+%\text{Precisão} &= \frac{N_\text{correct}}{N_\text{putative}}, \\[4pt]
+%\text{Matching score} &= \frac{N_\text{correct}}{N_\text{features}}, &
+%\text{Recall} &= \frac{N_\text{correct}}{N_\text{correspondences}}.
+%\end{align*}
+os seguintes denominadores:
 \begin{itemize}
   \item $N_\text{features}$: número de keypoints da imagem 1;
   \item $N_\text{putative}$: número de matches depois do ratio test e do cross-check;
@@ -232,38 +268,36 @@ A \textbf{repetibilidade} do detetor é $N_\text{correspondences}$ a dividir pel
 keypoints visíveis nas duas imagens. As tabelas apresentam a média por par.
 
 Para medir a qualidade da homografia, estimámo-la em cada par com RANSAC a partir dos matches putativos
-(\texttt{cv2.findHomography}, limiar de 3\px, no máximo 2000 iterações, confiança 0,995, seed fixa) e
+(\texttt{cv2.findHomography}, limiar de 3\px, no máximo 2000 iterações, confiança 0,995) e
 registámos:
 \begin{itemize}
   \item o número de \textbf{inliers} do RANSAC e o \textbf{rácio de inliers} ($N_\text{inliers}/N_\text{putative}$);
   \item o \textbf{erro médio de reprojeção} dos inliers, $\lVert \hat H p_1 - p_k\rVert$, com $\hat H$ a
-  homografia estimada;
-  \item a \textbf{exatidão da homografia}, medida pelo \emph{corner error}: a distância média entre os
-  quatro cantos da imagem~1 projetados com $\hat H$ e com a homografia verdadeira. Seguindo o
-  SuperPoint~\cite{detone2018}, apresentamos a percentagem de pares com erro até 1, 3 e 5\px. Um par em
-  que a homografia não pôde ser estimada conta como falhado.
+  homografia estimada; 
+   \item \textbf{Corner error:} distância média entre os quatro cantos da imagem~1, projetados pela homografia estimada e pela homografia verdadeira. Apresenta-se a percentagem de pares com erro até 1, 3 e 5~px, seguindo o protocolo do SuperPoint~\cite{detone2018}. Os pares em que não é possível estimar a homografia são considerados falhados. 
 \end{itemize}
-O limiar do RANSAC (3\px) é igual ao critério de correção de um match, para que ``inlier'' e ``match
+O limiar do RANSAC (3\px) coincide com o critério de correção de um \textit{match}, para que ``inlier'' e ``match
 correto'' usem a mesma tolerância.
 
+Todas as métricas foram calculadas para todos os métodos e pares. A Tabela~\ref{tab:hpatches} apresenta-as completas e as restantes tabelas mostram apenas as métricas relevantes para cada
+análise. Os valores completos estão nos ficheiros de resultados entregues.
+
 \subsection{Ambiente}
-Python 3.14.7, OpenCV 4.13.0 (\texttt{opencv-contrib-python} 4.13.0.92), NumPy 2.5.2, SciPy 1.18.1,
-pandas 3.0.6, PyTorch 2.14.1 (CUDA 12.6), LightGlue (repositório \texttt{cvg/LightGlue}, que fornece
-também o SuperPoint) e SuperGlue do Hugging Face \texttt{transformers} 5.18 (pesos
-\texttt{superglue\_outdoor} da Magic Leap, limiar de confiança 0,2, 100 iterações de Sinkhorn), num portátil
-com processador Intel Core i7-12650H e GPU NVIDIA GeForce RTX 3050 Ti Laptop. Os métodos clássicos correm
-no CPU e os aprendidos na GPU. Os tempos são médias por imagem (deteção e descrição) ou por par
-(emparelhamento), medidos depois de uma execução de aquecimento. Todos os resultados são da corrida
-final de 15 de outubro de 2026.
-\nota{(ambas) Referir que os tempos variaram entre corridas (cerca de 20\,\% entre a corrida de 12 e a de
-15 de outubro, com as métricas exatamente iguais; ver DECISOES.md, D28) e que os tempos na GPU têm picos
-quando aparece um tamanho de imagem novo (ver a secção do custo).}
+
+As experiências foram realizadas no seguinte ambiente:
+
+\begin{itemize} \item \textbf{Software:} Python 3.14.7, OpenCV 4.13.0 (\texttt{opencv-contrib-python} 4.13.0.92), NumPy 2.5.2, SciPy 1.18.1, pandas 3.0.6 e PyTorch 2.14.1 (CUDA 12.6).
+
+\item \textbf{Métodos aprendidos:} LightGlue e SuperPoint, obtidos do repositório \texttt{cvg/LightGlue}, com os pesos pré-treinados distribuídos pelo pacote; SuperGlue, através do \texttt{transformers} 5.18, com os pesos \texttt{superglue\_outdoor} da Magic Leap, limiar de confiança de 0,2 e 100 iterações de Sinkhorn.
+
+\item \textbf{Hardware:} portátil com processador Intel Core i7-12650H e GPU NVIDIA GeForce RTX 3050 Ti Laptop. Os métodos clássicos são executados no CPU e os métodos aprendidos na GPU.
+
+\item \textbf{Medição dos tempos:} os tempos são calculados após uma execução de aquecimento e apresentados como médias por imagem, para deteção e descrição ou por par de imagens, para emparelhamento.
+
+\end{itemize}
 
 % ============================================================================
-\section{Resultados e discussão: detetores, descritores e matchers}
-% Enunciado §5 e §9c. Discutir PORQUÊ, não só apresentar números.
-% Os números das tabelas são da corrida final de 15 de outubro de 2026 (9 métodos),
-% gerados a partir dos CSV em results/tables (prefixo final_).
+\section{Resultados e discussão: detetores, descritores e matchers} 
 % ============================================================================
 
 \subsection{Deteção: repetibilidade e estudo do FAST}
@@ -301,38 +335,29 @@ SIFT & 3425 & 6196 & 81,4 & 96,8 & 0,47 (0,14) & 0,52 (0,15) & 0 / 0 \\
 \centering
 \begin{subfigure}{0.49\linewidth}\figura{figuras/fast_study/fast_repeatability_i.png}\caption{Iluminação}\end{subfigure}\hfill
 \begin{subfigure}{0.49\linewidth}\figura{figuras/fast_study/fast_repeatability_v.png}\caption{Ponto de vista}\end{subfigure}
-\caption{Repetibilidade do FAST em função do threshold, com e sem NMS, e nível ao acaso (cinzento).
+\caption{Repetibilidade do FAST em função do threshold com e sem NMS e nível ao acaso (cinzento).
 Linha horizontal: SIFT.}
 \label{fig:fast-rep}
 \end{figure}
 
-\nota{(Carolina) Pontos a discutir, com os números da Tabela~\ref{tab:fast}: (1) subir o threshold reduz
-muito o número de pontos (cerca de 21 a 25 vezes de $t=10$ para $t=80$) e pouco a repetibilidade, e o nível
-ao acaso desce muito mais: com threshold alto a repetibilidade é quase toda real; (2) sem NMS há 2,5 a 4
-vezes mais pontos, mas são vizinhos redundantes dos mesmos cantos; (3) o FAST é muito mais rápido do que o
-SIFT e, com um número de pontos semelhante ($t=40$), tem repetibilidade mais alta; ressalva: este estudo só
-mede a posição dos pontos, não a invariância à escala do SIFT. Explicar porque foi excluído o threshold 5 e
-porque a repetibilidade usa só os pares comuns (DECISOES.md, D24).}
+A Tabela~\ref{tab:fast} mostra que aumentar o threshold reduz significativamente o número de keypoints: com NMS, entre $t = 10$ e $t = 80$, a redução é de cerca de 25 vezes em iluminação e 21
+vezes em ponto de vista. A repetibilidade diminui menos, enquanto o nível ao acaso desce muito mais sugerindo que para
+thresholds mais elevados, uma maior proporção da repetibilidade observada corresponde a correspondências geometricamente consistentes.
 
-\begin{figure}[H]
-\centering
-\begin{subfigure}{0.32\linewidth}\figura{figuras/qualitative/keypoints/SIFT.jpg}\caption{SIFT}\end{subfigure}\hfill
-\begin{subfigure}{0.32\linewidth}\figura{figuras/qualitative/keypoints/ORB.jpg}\caption{ORB}\end{subfigure}\hfill
-\begin{subfigure}{0.32\linewidth}\figura{figuras/qualitative/keypoints/FAST-BRIEF.jpg}\caption{FAST}\end{subfigure}
-\caption{Keypoints na imagem 1 do GRAF ($400\times320$\px), com limite de 2000 pontos. O marcador tem
-tamanho fixo e não representa a escala nem a orientação.}
-\label{fig:keypoints}
-\end{figure}
+A remoção da NMS aumenta o número de pontos e consequentemente a redundância pois são detetados vários pontos próximos dos mesmos cantos. Embora a repetibilidade seja superior sem NMS, parte deste aumento poderá resultar da maior densidade de pontos, que também favorece correspondências acidentais como sugere o nível ao acaso mais elevado. Além disso, são excluídos mais pares devido ao limite de pontos por imagem.
 
-\nota{(Carolina) Comentar a distribuição espacial: o SIFT espalha os pontos pela imagem; o ORB concentra-os
-nas zonas de maior contraste e não tem pontos junto à borda.}
+Face ao SIFT, o FAST é substancialmente mais rápido. Na configuração $t = 40$ com NMS, produz um número de
+pontos da mesma ordem de grandeza e apresenta maior repetibilidade em ambas as condições. Para obter
+poucos pontos e repetíveis, o threshold alto com NMS é uma escolha adequada enquanto que um threshold baixo sem NMS
+só aumenta o número de pontos, não necessariamente a qualidade.
 
 \subsection{Emparelhamento em iluminação e ponto de vista}
+\label{sec:hpatches}
+
 \begin{table}[H]
 \centering\small
 \caption{Resultados no HPatches, separados por iluminação (i, 285 pares) e ponto de vista (v, 295 pares):
-médias por par das contagens e das quatro métricas. Limite de 2000 keypoints por imagem, ratio test 0,8
-com cross-check, match correto se o erro for inferior a 3\px.}
+médias por par das contagens e das quatro métricas.}
 \label{tab:hpatches}
 \begin{tabular}{llrrrrcccc}
 \toprule
@@ -363,47 +388,67 @@ Método & & $N_\text{feat}$ & $N_\text{put}$ & $N_\text{corr}$ & $N_\text{corres
 \end{tabular}
 \end{table}
 
-\nota{(Carolina) Discutir porquê: o FAST+BRIEF é dos melhores clássicos em iluminação (não há rotação nem
-escala) e cai em ponto de vista; SIFT e KAZE são os mais estáveis nas duas categorias. Referir a degradação
-com a dificuldade em ponto de vista (precisão de $1\to2$ para $1\to6$: SIFT 0,89 para 0,59; FAST+BRISK 0,73
-para 0,35) e que em iluminação a média esconde sequências muito difíceis. (Inês) Métodos aprendidos: o
-SuperPoint+NN, com o mesmo matching dos clássicos, já é o melhor em precisão e matching score nas duas
-categorias (descritor mais distintivo). Com os mesmos keypoints e descritores, os matchers aprendidos
-quase duplicam o recall (NN 0,53/0,50; SuperGlue 0,94/0,93; LightGlue 0,92/0,91, em i/v) sem perder
-precisão: isto separa o contributo do matcher do do descritor (enunciado §4). SuperGlue e LightGlue ficam
-muito próximos em exatidão (o SuperGlue ligeiramente acima em ponto de vista), mas o SuperGlue é cerca de
-7 vezes mais lento a emparelhar (Tabela~\ref{tab:custo}), o que confirma a afirmação do §2.6. O mesmo acontece com o SIFT: o recall passa de 0,42/0,51 (SIFT
-clássico) para 0,85/0,87 com o LightGlue. Os keypoints do SIFT do LightGlue não são os do
-\texttt{cv2.SIFT} (outro detetor, RootSIFT), por isso o $N_\text{corresp}$ é diferente.}
+%\begin{figure}[H]
+%\centering
+%\begin{subfigure}{0.49\linewidth}\figura{figuras/curves/F1_precision_i.png}\caption{Iluminação}\end{subfigure}\hfill
+%\begin{subfigure}%{0.49\linewidth}\figura{figuras/curves/F1_precision_v.png}\caption{Ponto de vista}\end{subfigure}
+%\caption{Precisão em função do par $1\to k$ do HPatches ($k = 2,\dots,6$) }
+%\label{fig:precisao-k}
+%\end{figure}
+
+A precisão apenas não chega para comparar os métodos (0,54--0,78), por isso a comparação é feita sobretudo pelo matching score, que combina o número de matches com a sua correção.
+
+Em iluminação, o FAST+BRIEF apresenta o maior matching score entre os métodos clássicos (0,244), seguido do KAZE. Como a geometria não muda, o que conta é a tolerância do descritor às variações de luz e as comparações de intensidade do BRIEF mantêm-se enquanto a ordem dos píxeis não se inverter. O BRISK e o FREAK, com os mesmos pontos FAST, ficam abaixo dele: o HPatches quase não tem rotação no plano da imagem e por isso a orientação que estes descritores estimam não traz vantagem e os erros dessa estimativa rodam o padrão de amostragem, o que é uma a explicação possível. O ORB, apesar de ter o maior número de correspondências
+possíveis ($N_\text{corresp} \approx 940$), recupera apenas um quarto delas (recall 0,25): os seus pontos concentram-se em aglomerados nas zonas de maior contraste (Figura~\ref{fig:keypoints}) e pontos vizinhos têm descritores parecidos que o ratio test rejeita como ambíguos. 
+
+Em ponto de vista, o SIFT apresenta o maior matching score entre os métodos clássicos (0,200), seguido do KAZE. O FAST+BRIEF sofre uma redução acentuada, de 0,244 para 0,125, enquanto o BRISK e o FREAK descem para menos de metade. A degradação é consistente com as limitações dos descritores aplicados a pontos FAST que não fornecem informação de escala. O ORB desce pouco entre as duas condições (de 0,154 para 0,133), graças à sua pirâmide de escalas. O SIFT e o KAZE são os mais equilibrados entre iluminação e ponto de vista, enquanto o FAST+BRIEF se destaca em iluminação mas é o mais sensível às alterações de ponto de vista.
+
+Nos métodos aprendidos, o SuperPoint+NN, com o mesmo \textit{matching} dos métodos clássicos, supera todos os clássicos em precisão e \textit{matching score} nas duas categorias (\textit{matching score} de 0,301 em iluminação e 0,254 em ponto de vista, contra 0,244 e 0,200 dos melhores clássicos). Como o \textit{matcher} é o mesmo, esta vantagem vem do detetor e do descritor, que foram treinados com homografias e \textit{augmentation} fotométrico, ou seja, com o mesmo tipo de transformações aqui avaliadas, o que também pode favorecer o SuperPoint nesta comparação.
+
+Como o extrator é o mesmo nas três configurações com SuperPoint, a diferença entre elas mede apenas o contributo do \textit{matcher}. Os \textit{matchers} aprendidos quase duplicam o recall, de 0,53 e 0,50 com o NN para 0,93 e 0,93 com o SuperGlue e 0,92 e 0,91 com o LightGlue, em iluminação e ponto de vista. Os \textit{matches} corretos recuperados são possivelmente os que o \textit{ratio test} rejeita por ambiguidade: quando dois candidatos estão a distâncias semelhantes, o NN descarta o par mesmo que o mais próximo esteja correto, enquanto o SuperGlue e o LightGlue o desambiguam através da posição dos pontos e do contexto das duas imagens. Por isso, com estes \textit{matchers}, a diferença entre iluminação e ponto de vista praticamente desaparece no recall.
+
+O SuperGlue fica ligeiramente acima do LightGlue em \textit{matching score} e recall com um custo de emparelhamento bastante maior (Secção~\ref{sec:custo}). O mesmo efeito do \textit{matcher} aparece no SIFT: o recall passa de 0,42 e 0,51 com o SIFT clássico para 0,85 e 0,87 com o SIFT+LightGlue. Esta comparação é menos direta, porque o SIFT do pacote do LightGlue não deteta os mesmos pontos que o do OpenCV e o número de correspondências possíveis é diferente.
+
 
 \subsection{Robustez à rotação e à escala}
+\label{sec:robustez}
+
 \begin{table}[H]
 \centering\small
-\caption{Robustez nas quatro categorias: iluminação (i) e ponto de vista (v) no HPatches; rotação (rot,
-12 ângulos) e escala (esc, 9 fatores) no teste sintético. Precisão, matching score e repetibilidade, em
-média por par.}
+\caption{Robustez à rotação (rot, 12 ângulos) e à escala (esc, 9 fatores) no teste sintético:
+precisão e matching score, em média por par (os valores em iluminação e ponto de vista estão na
+Tabela~\ref{tab:hpatches}). A repetibilidade do detetor é dada nas quatro categorias.}
 \label{tab:robustez}
 \setlength{\tabcolsep}{4pt}
-\begin{tabular}{lcccccccccccc}
+\begin{tabular}{lcccccccc}
 \toprule
- & \multicolumn{4}{c}{Precisão} & \multicolumn{4}{c}{Matching score} & \multicolumn{4}{c}{Repetibilidade} \\
-\cmidrule(lr){2-5}\cmidrule(lr){6-9}\cmidrule(lr){10-13}
-Método & i & v & rot & esc & i & v & rot & esc & i & v & rot & esc \\
+ & \multicolumn{2}{c}{Precisão} & \multicolumn{2}{c}{Matching score} & \multicolumn{4}{c}{Repetibilidade} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-9}
+Método & rot & esc & rot & esc & i & v & rot & esc \\
 \midrule
-SIFT & 0,735 & 0,747 & 0,995 & 0,974 & 0,191 & 0,200 & 0,737 & 0,396 & 0,401 & 0,484 & 0,762 & 0,699 \\
-ORB & 0,696 & 0,685 & 0,922 & 0,943 & 0,154 & 0,133 & 0,581 & 0,287 & 0,502 & 0,591 & 0,822 & 0,646 \\
-KAZE & 0,780 & 0,743 & 0,990 & 0,940 & 0,226 & 0,173 & 0,815 & 0,273 & 0,516 & 0,564 & 0,951 & 0,795 \\
-FAST+BRIEF & 0,776 & 0,597 & 0,080 & 0,551 & 0,244 & 0,125 & 0,010 & 0,139 & 0,505 & 0,581 & 0,793 & 0,689 \\
-FAST+BRISK & 0,739 & 0,546 & 0,987 & 0,494 & 0,169 & 0,079 & 0,624 & 0,120 & 0,503 & 0,598 & 0,819 & 0,744 \\
-FAST+FREAK & 0,673 & 0,542 & 0,983 & 0,568 & 0,158 & 0,086 & 0,578 & 0,147 & 0,504 & 0,586 & 0,801 & 0,706 \\
+SIFT & 0,995 & 0,974 & 0,737 & 0,396 & 0,401 & 0,484 & 0,762 & 0,699 \\
+ORB & 0,922 & 0,943 & 0,581 & 0,287 & 0,502 & 0,591 & 0,822 & 0,646 \\
+KAZE & 0,990 & 0,940 & 0,815 & 0,273 & 0,516 & 0,564 & 0,951 & 0,795 \\
+FAST+BRIEF & 0,080 & 0,551 & 0,010 & 0,139 & 0,505 & 0,581 & 0,793 & 0,689 \\
+FAST+BRISK & 0,987 & 0,494 & 0,624 & 0,120 & 0,503 & 0,598 & 0,819 & 0,744 \\
+FAST+FREAK & 0,983 & 0,568 & 0,578 & 0,147 & 0,504 & 0,586 & 0,801 & 0,706 \\
 \midrule
-SuperPoint+NN & 0,817 & 0,774 & 0,235 & 0,866 & 0,301 & 0,254 & 0,062 & 0,285 & 0,526 & 0,640 & 0,795 & 0,691 \\
-SuperPoint+SuperGlue & 0,793 & 0,829 & 0,339 & 0,973 & 0,492 & 0,426 & 0,206 & 0,380 & 0,526 & 0,640 & 0,795 & 0,691 \\
-SuperPoint+LightGlue & 0,799 & 0,799 & 0,254 & 0,946 & 0,482 & 0,418 & 0,152 & 0,385 & 0,526 & 0,640 & 0,795 & 0,691 \\
-SIFT+LightGlue & 0,823 & 0,828 & 0,989 & 0,970 & 0,370 & 0,357 & 0,726 & 0,375 & 0,423 & 0,519 & 0,772 & 0,734 \\
+SuperPoint+NN & 0,235 & 0,866 & 0,062 & 0,285 & 0,526 & 0,640 & 0,795 & 0,691 \\
+SuperPoint+SuperGlue & 0,339 & 0,973 & 0,206 & 0,380 & 0,526 & 0,640 & 0,795 & 0,691 \\
+SuperPoint+LightGlue & 0,254 & 0,946 & 0,152 & 0,385 & 0,526 & 0,640 & 0,795 & 0,691 \\
+SIFT+LightGlue & 0,989 & 0,970 & 0,726 & 0,375 & 0,423 & 0,519 & 0,772 & 0,734 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+
+%\begin{figure}[H]
+%\centering
+%\begin{subfigure}{0.49\linewidth}\figura{figuras/curves/F1_precision_rot.png}\caption{Rotação}\end{subfigure}\hfill
+%\begin{subfigure}{0.49\linewidth}\figura{figuras/curves/F1_precision_scale.png}\caption{Escala}\end{subfigure}
+%\caption{Precisão em função do ângulo de rotação e do fator de escala (teste sintético sobre a imagem 1 do GRAF; um par por nível).}
+%\label{fig:rot-escala}
+% \end{figure}
 
 \begin{figure}[H]
 \centering
@@ -414,20 +459,28 @@ do GRAF; um par por nível).}
 \label{fig:rot-escala}
 \end{figure}
 
-\nota{(Carolina) Discutir: o BRIEF não tem orientação e falha a partir de 30\textdegree{} (0,83 a
-15\textdegree{}, 0,13 a 30\textdegree{}, 0 a partir de 45\textdegree{}), enquanto BRISK e FREAK, com os
-mesmos keypoints FAST, mantêm precisão acima de 0,98; o FAST não tem escala, por isso os três descritores
-com FAST só funcionam perto do fator 1; SIFT mantém-se acima de 0,95 em todas as escalas. Notar que a
-repetibilidade se mantém razoável onde a precisão cai: o que falha é o descritor, não o detetor. Limitações
-do teste sintético: uma só imagem, sem ruído nem mudança de luz. (Inês) O SuperPoint também não é
-invariante à rotação: com LightGlue mantém precisão de 0,97 até 45\textdegree{} e cai para 0 a partir de
-60\textdegree{} (com NN já cai para 0,54 a 45\textdegree{}; com SuperGlue aguenta 0,96 a 60\textdegree{} e cai
-a partir de 75\textdegree{}); o descritor não tem orientação e o treino
-(\emph{homographic adaptation}) só inclui rotações pequenas. O SIFT+LightGlue mantém-se acima de 0,98 em
-todos os ângulos, porque usa a orientação do SIFT. Na escala, o LightGlue recupera o SuperPoint (precisão
-0,98 a 0,5$\times$ contra 0,72 com NN).}
+Na rotação com os mesmos pontos FAST, o BRISK e o FREAK,
+que rodam o padrão de amostragem para a orientação do ponto, mantêm uma alta precisão, enquanto
+o BRIEF, sem orientação, desce para 0,080: a Figura~\ref{fig:rot-escala} mostra que já falha a partir
+de 30\textdegree{}. A repetibilidade do FAST mantém-se alta (pontos continuam a ser
+detetados) o que falha é o descritor, não o detetor. SIFT, KAZE e ORB que também estimam a orientação,
+mantêm-se acima de 0,92.
+
+Na escala, SIFT, ORB e KAZE mantêm a precisão acima
+de 0,94, enquanto os três descritores sobre pontos FAST ficam entre 0,49 e 0,57 e só funcionam perto
+do fator 1 (Figura~\ref{fig:rot-escala}): o FAST deteta numa única escala e o patch descrito deixa de
+cobrir a mesma região quando a imagem é ampliada ou reduzida. Este resultado explica a queda destes
+métodos em ponto de vista (Secção~\ref{sec:hpatches}), que inclui mudanças de escala.
+
+O SuperPoint também não é invariante à rotação. A sua repetibilidade mantém-se entre 0,75 e 0,83 em todos os ângulos, por isso, tal como no BRIEF, o que falha é o descritor e não o detetor: o descritor não tem orientação e o treino só inclui rotações limitadas. O \textit{matcher} determina até onde esta limitação se nota. Com o NN, a precisão desce para 0,54 aos 45\textdegree{}. Com o LightGlue mantém-se em 0,97 até aos 45\textdegree{} e cai para zero a partir dos 60\textdegree{}. O SuperGlue aguenta mais um passo (0,96 aos 60\textdegree{}) e só cai a partir dos 75\textdegree{}. Os \textit{matchers} aprendidos compensam a degradação dos descritores com a disposição espacial dos pontos, mas só enquanto os descritores ainda dão algum sinal, daí a queda abrupta. Já o SIFT+LightGlue fica acima de 0,97 em todos os ângulos, porque o descritor SIFT é calculado na orientação dominante de cada ponto e é, por isso, invariante à rotação.
+
+Na escala, os \textit{matchers} aprendidos compensam o descritor: na redução para 0,5$\times$, o SuperPoint+NN tem precisão de 0,72 e \textit{matching score} de apenas 0,02, enquanto o SuperPoint+LightGlue chega a 0,98 e 0,26. O SuperPoint deteta e descreve numa só escala, por isso os descritores do mesmo ponto em escalas diferentes afastam-se e o \textit{ratio test} rejeita quase todos os pares; os poucos que sobrevivem estão maioritariamente corretos, o que explica a precisão razoável com um \textit{matching score} quase nulo. O LightGlue recupera estes pares através do contexto das duas imagens.
+
+Este teste isola cada fator, recorrendo a uma imagem sem ruído nem mudanças de iluminação.
 
 \subsection{Análise qualitativa}
+\label{sec:qualitativa}
+
 \begin{table}[H]
 \centering\small
 \caption{Pares GRAF, com ponto de vista cada vez mais afastado. Matches corretos sobre o total de matches,
@@ -456,6 +509,18 @@ SIFT+LightGlue & 618 / 623 & 0,992 & 0,670 & & 348 / 396 & 0,879 & 0,604 \\
 
 \begin{figure}[H]
 \centering
+\begin{subfigure}{0.32\linewidth}\figura{figuras/qualitative/keypoints/SIFT.jpg}\caption{SIFT}\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}\figura{figuras/qualitative/keypoints/ORB.jpg}\caption{ORB}\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}\figura{figuras/qualitative/keypoints/FAST-BRIEF.jpg}\caption{FAST}\end{subfigure}
+\caption{Keypoints na imagem 1 do GRAF ($400\times320$\px), com limite de 2000 pontos. O marcador tem
+tamanho fixo e não representa a escala nem a orientação.}
+\label{fig:keypoints}
+\end{figure}
+
+Na Figura~\ref{fig:keypoints}, o SIFT distribui os pontos por toda a imagem pois deteta estruturas a várias escalas. O ORB concentra-os em aglomerados nas zonas de maior contraste, sem pontos junto à borda e o FAST segue os contornos do desenho sem pontos nas regiões uniformes.
+
+\begin{figure}[H]
+\centering
 \figura[0.9\linewidth]{figuras/qualitative/graf_1to3/SIFT.jpg}\\[6pt]
 \figura[0.9\linewidth]{figuras/qualitative/graf_1to3/FAST-BRIEF.jpg}
 \caption{Matches entre as imagens 1 e 3 do GRAF com SIFT (em cima) e FAST+BRIEF (em baixo). Verde:
@@ -463,12 +528,17 @@ correto (erro inferior a 3\px{} com a homografia verdadeira); vermelho: errado.}
 \label{fig:matches-graf}
 \end{figure}
 
-\nota{(Carolina) Comentar exemplos de matches certos e errados. No par $1\to3$ a repetibilidade continua
-alta (0,54 a 0,76), mas a precisão cai (0 a 0,52): os detetores voltam a encontrar os mesmos pontos, e os
-descritores deixam de os reconhecer porque a perspetiva deforma a vizinhança. Os métodos com matchers
-aprendidos (SuperGlue e LightGlue) são os únicos que resistem a este par (cerca de 350 matches corretos,
-precisão 0,87--0,89): o matcher usa o contexto de todos os pontos, e não só a vizinhança de cada um. O SuperPoint+NN tem precisão alta (0,875)
-mas só 8 matches: o ratio test e o cross-check eliminam quase todos.}
+No par $1\to3$ do GRAF (Figura~\ref{fig:matches-graf}), o SIFT acerta cerca de metade dos matches (32
+em 65) porque o seu descritor é calculado numa região ajustada à escala e à orientação de cada ponto,
+o que compensa parte da deformação causada pela perspetiva. Os seus erros têm algumas possíveis causas: 1) pontos em
+zonas da parede que só aparecem numa das imagens e que por isso não têm correspondente verdadeiro 2)
+padrões repetidos, como as faixas azuis em que várias vizinhanças são quase iguais 3) e pontos onde a
+perspetiva já deformou demasiado a vizinhança. O FAST+BRIEF falha todos os matches (0 em 15) apesar de
+os pontos continuarem a ser detetados (repetibilidade 0,69): o BRIEF descreve sempre um patch do mesmo tamanho e orientação que com a perspetiva deixa de cobrir a mesma região da cena.
+
+Os métodos com \textit{matchers} aprendidos são os que melhor resistem a este par (cerca de 350 matches corretos, precisão 0,87--0,89), enquanto o SuperPoint+NN com os mesmos pontos e descritores, obtém apenas 7. Tal como na Secção~\ref{sec:hpatches}, a diferença vem do \textit{matcher}: a perspetiva deforma a vizinhança local de cada ponto, mas não a disposição relativa dos pontos, que o \textit{matcher} aprendido também usa.
+
+
 
 \subsection{BRIEF: estratégias de amostragem}
 \begin{table}[H]
@@ -492,13 +562,10 @@ Implementado, G V & 0,708 & 0,492 & 0,081 & 0,513 & 0,212 & 0,095 & 0,377 & 0,18
 \end{tabular}
 \end{table}
 
-\nota{(Carolina) Discutir: a G~II (a usada pelos autores) fica ao nível do BRIEF do OpenCV, o que valida a
-implementação; a G~V, regular e a partir do centro, é a pior em precisão, como no artigo; a G~III, com pares
-curtos, é a melhor em iluminação; a G~I, com pares longos, é a mais frágil em ponto de vista, escala e
-rotação. Nenhuma estratégia resolve a falta de orientação. O descritor implementado é mais lento (NumPy e
-suavização gaussiana contra C++ e imagens integrais).}
+A G~III obtém os melhores resultados em iluminação (precisão de 0,866 e matching score de 0,301), sugerindo que os pares curtos favorecem a comparação de características locais neste cenário. Em contrapartida, a G~I, com pares mais afastados, apresenta os piores resultados em rotação e escala (precisões de 0,050 e 0,441), sendo mais sensível às alterações da região abrangida pelo descritor. A G~II, correspondente à estratégia dos autores, apresenta resultados próximos dos do OpenCV, enquanto a G~V, com amostragem regular a partir do centro, obtém a menor precisão em iluminação e ponto de vista. Estes resultados mostram que a distribuição dos pares influencia o desempenho do BRIEF, embora nenhuma estratégia compense a ausência de orientação, que limita a robustez à rotação. 
 
 \subsection{Exatidão da homografia}
+\label{sec:homografia}
 \begin{table}[H]
 \centering\small
 \caption{Homografia estimada com RANSAC (limiar 3\px) a partir dos matches putativos, no HPatches.
@@ -564,53 +631,47 @@ SIFT+LightGlue & 0,53 & 1,00 & & 0,14 & 1,00 \\
 \end{tabular}
 \end{table}
 
-\nota{(Carolina) Discutir: (1) em iluminação quase todos os métodos dão homografias boas (72--90\,\% dos
-pares até 3\px), porque a geometria não muda; em ponto de vista a exatidão cai para 31--61\,\%. (2) O
-melhor em ponto de vista é o SuperPoint+SuperGlue (63\,\% até 3\px), seguido do SuperPoint+LightGlue
-(61\,\%) e de SIFT e SIFT+LightGlue (59\,\%); os FAST+binários são os piores (31--37\,\%). (3) Rácio de inliers alto não garante homografia
-boa: o FAST+BRIEF tem 0,84 em iluminação mas só 50\,\% dos pares até 1\px. (4) O erro de reprojeção dos
-métodos aprendidos é maior (cerca de 1--1,3\px{} contra 0,5--0,8\px{} no SIFT), porque os keypoints do
-SuperPoint são localizados ao píxel, sem refinamento subpíxel; isso não impede homografias tão boas ou
-melhores, porque têm mais inliers. (5) Na rotação, os métodos sem orientação (BRIEF, SuperPoint) dão
-homografias completamente erradas (centenas de píxeis), coerente com a Tabela~\ref{tab:robustez}.}
+Em iluminação, quase todos os métodos estimam homografias exatas (72 a 90\,\% dos pares com corner error até 3\,px), porque a geometria não muda e sobram muitos matches corretos. Em ponto de vista, a exatidão desce para todos e a ordem acompanha a das métricas de emparelhamento: os \textit{matchers} aprendidos são os melhores (61 a 63\,\%), seguidos do SIFT e do SIFT+LightGlue (59\,\%) e os métodos sobre pontos FAST os piores (31 a 37\,\%), porque perdem os matches nas mudanças de escala.
+
+
+Um rácio de inliers elevado não garante, por si só, uma homografia exata: o FAST+BRIEF  apresenta um rácio de 0,84 em iluminação, mas apenas 50\% dos pares têm corner error até 1\,px. O rácio mede a consistência dos matches com a homografia estimada, enquanto o corner error avalia a proximidade dessa homografia à transformação verdadeira. Os métodos com SuperPoint têm um erro médio de reprojeção superior (1,0 a 1,3\,px, contra 0,5 a 0,8\,px no SIFT), porque a implementação usada devolve os pontos em coordenadas inteiras, sem refinamento ao subpíxel. Este erro é medido nos próprios inliers e não indica homografias piores: em ponto de vista, com o SuperGlue e o LightGlue, a fração de pares com corner error até 3\,px (63\,\% e 61\,\%) é igual ou superior à do SIFT (59\,\%).
+
+O teste sintético permite isolar melhor o efeito das transformações geométricas. Na rotação, o BRIEF e as variantes de SuperPoint produzem erros muito elevados, enquanto os métodos com compensação da orientação mantêm elevada exatidão. Na escala, degradam-se os três métodos sobre pontos FAST (mediana de 1,8 a 6,2\,px), que não têm espaço de escalas (Secção~\ref{sec:robustez}), ao contrário do SIFT, com 0,17\,px.
 
 \subsection{Custo computacional e compromisso entre exatidão e eficiência}
+\label{sec:custo}
 \begin{table}[H]
 \centering\small
-\caption{Custo computacional, em média sobre os 580 pares do HPatches. Tempos de deteção e de descrição
-por imagem e de emparelhamento por par; o tempo total por par é duas vezes a deteção e a descrição mais o
-emparelhamento. Memória: descritores de uma imagem. Métodos clássicos no CPU; métodos aprendidos na GPU,
-onde o SuperPoint e o SIFT do LightGlue fazem deteção e descrição numa só passagem (tempo todo na
-coluna da deteção).}
+\caption{Custo computacional, em média sobre os 580 pares do HPatches. Tempos de deteção e de descrição por imagem e de emparelhamento por par; o tempo total por par é duas vezes a deteção e a descrição mais o emparelhamento. Memória: descritores de uma imagem. A dimensão e os bytes por descritor de cada método estão nas Tabelas~\ref{tab:metodos} e~\ref{tab:aprendidos}.
+}
 \label{tab:custo}
-\begin{tabular}{lrrrrrrr}
+\begin{tabular}{lrrrrr}
 \toprule
- & \multicolumn{4}{c}{Tempo (ms)} & \multicolumn{3}{c}{Descritor} \\
-\cmidrule(lr){2-5}\cmidrule(lr){6-8}
-Método & Deteção & Descrição & Emparelh. & Total & Dimensão & Bytes & Memória (kB) \\
+ & \multicolumn{4}{c}{Tempo (ms)} & \\
+\cmidrule(lr){2-5}
+Método & Deteção & Descrição & Emparelh. & Total & Memória (kB) \\
 \midrule
-SIFT & 127,6 & 94,5 & 18,1 & 462 & 128 & 512 & 878 \\
-ORB & 13,0 & 8,0 & 15,8 & 58 & 256 bits & 32 & 61 \\
-KAZE & 455,7 & 361,7 & 10,8 & 1646 & 64 & 256 & 393 \\
-FAST+BRIEF & 9,5 & 5,2 & 14,4 & 44 & 256 bits & 32 & 57 \\
-FAST+BRISK & 9,3 & 15,8 & 15,8 & 66 & 512 bits & 64 & 119 \\
-FAST+FREAK & 9,2 & 30,8 & 14,8 & 95 & 512 bits & 64 & 115 \\
+SIFT & 127,6 & 94,5 & 18,1 & 462 & 878 \\
+ORB & 13,0 & 8,0 & 15,8 & 58 & 61 \\
+KAZE & 455,7 & 361,7 & 10,8 & 1646 & 393 \\
+FAST+BRIEF & 9,5 & 5,2 & 14,4 & 44 & 57 \\
+FAST+BRISK & 9,3 & 15,8 & 15,8 & 66 & 119 \\
+FAST+FREAK & 9,2 & 30,8 & 14,8 & 95 & 115 \\
 \midrule
-SuperPoint+NN & 164,7 & --- & 38,4 & 368 & 256 & 1024 & 1804 \\
-SuperPoint+SuperGlue & 86,1 & --- & 293,7 & 466 & 256 & 1024 & 1804 \\
-SuperPoint+LightGlue & 86,3 & --- & 43,4 & 216 & 256 & 1024 & 1804 \\
-SIFT+LightGlue & 174,4 & --- & 45,6 & 394 & 128 & 512 & 787 \\
+SuperPoint+NN & 164,7 & --- & 38,4 & 368 & 1804 \\
+SuperPoint+SuperGlue & 86,1 & --- & 293,7 & 466 & 1804 \\
+SuperPoint+LightGlue & 86,3 & --- & 43,4 & 216 & 1804 \\
+SIFT+LightGlue & 174,4 & --- & 45,6 & 394 & 787 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\nota{(ambas) Tempos dos métodos aprendidos: o extrator do SuperPoint é o mesmo nas três linhas, mas a
-média da deteção do SuperPoint+NN é maior (164,7 contra 86\,ms; medianas 122 e 57\,ms). A diferença vem
-de picos de segundos na GPU quando aparece um tamanho de imagem novo (o HPatches tem imagens de vários
-tamanhos), e o SuperPoint+NN corre primeiro em cada par, por isso paga quase sempre esse custo. Dizer isto
-no texto, ou apresentar a mediana. O matching do SuperGlue (294\,ms) é cerca de 7 vezes mais lento que o
-do LightGlue (43\,ms): o LightGlue para mais cedo nos pares fáceis e descarta pontos sem par (§2.6).
-Tempos de GPU e de CPU não são diretamente comparáveis.}
+Entre os métodos clássicos, o custo é dominado pela deteção e pela descrição. O FAST+BRIEF e o ORB são os mais rápidos, porque o FAST decide cada píxel com poucas comparações e os descritores binários se comparam com operações de bits; o KAZE é o mais lento, por construir o espaço de escalas não linear e o SIFT fica numa posição intermédia, com descritores maiores. Os tempos dos métodos aprendidos, executados na GPU, não são diretamente comparáveis com os dos clássicos, executados no CPU, e os seus descritores ocupam muito mais memória (1024 bytes por ponto, contra 32 a 64 nos binários).
+
+
+Nos métodos aprendidos, o custo depende também do emparelhador. O SuperGlue demora cerca de 294\,ms por par a emparelhar, cerca de 7 vezes mais do que o LightGlue
+(43\,ms): o SuperGlue aplica sempre todas as camadas e o transporte ótimo, enquanto o LightGlue termina mais cedo nos pares fáceis e descarta pontos sem par, à custa de uma exatidão ligeiramente inferior. A diferença inclui também diferenças de implementação. O emparelhamento por vizinho mais próximo é também relativamente barato, mas os tempos de deteção do SuperPoint+NN são afetados por picos de execução na GPU associados a novos tamanhos de imagem. Por esse motivo, as médias desta configuração não são diretamente representativas do custo habitual.
+ 
 
 \begin{figure}[H]
 \centering
@@ -620,26 +681,26 @@ Tempos de GPU e de CPU não são diretamente comparáveis.}
 \label{fig:compromisso}
 \end{figure}
 
-\nota{(ambas) Discutir o compromisso e responder às duas perguntas do enunciado: que método é mais
-adequado a tempo real e qual é mais adequado quando a exatidão é a prioridade. Dos clássicos: em
-iluminação o FAST+BRIEF é o mais rápido e o de maior matching score; em ponto de vista o SIFT tem o maior
-matching score e o KAZE é cerca de 3,5 vezes mais lento com um valor mais baixo; entre os rápidos, o ORB é
-o melhor em ponto de vista. Com os aprendidos: SuperPoint+SuperGlue e SuperPoint+LightGlue têm os maiores
-matching scores (0,49/0,43 e 0,48/0,42, mais do dobro do SIFT); o LightGlue consegue-o com um tempo total
-por par (216\,ms) mais baixo que o SIFT e que o SuperGlue (466\,ms), mas precisa de GPU; a prioridade à exatidão aponta para SuperPoint+LightGlue (ou SIFT+LightGlue se houver
-rotações grandes), e o tempo real no CPU para ORB ou FAST+BRIEF (este só sem rotação). Não comparar
-métodos só pelo número de keypoints (enunciado §5).}
+A Figura~\ref{fig:compromisso} relaciona o custo com a qualidade do emparelhamento. Entre os métodos clássicos, o FAST+BRIEF dispõe do melhor compromisso em iluminação, sendo simultaneamente o mais rápido e o de maior matching score nessa condição. Em ponto de vista, o SIFT apresenta o melhor resultado clássico, enquanto o KAZE, apesar do elevado custo, não o supera.
+
+Daqui surgem duas sugestões. \textbf{Para aplicações em tempo real} (sem GPU) o ORB é a escolha mais adequada: custa 58\,ms por par, é invariante à rotação e à escala e o seu desempenho é estável
+entre iluminação e ponto de vista. O FAST+BRIEF é ainda mais rápido (44\,ms), mas só é fiável quando não há rotações nem mudanças de escala (Secção~\ref{sec:robustez}). \textbf{Quando a exatidão é a prioridade}, o
+SuperPoint+LightGlue é a melhor opção, desde que haja GPU: tem um dos maiores matching scores e recalls e o menor custo entre os métodos aprendidos. Se as imagens tiverem rotações grandes, o SIFT+LightGlue é preferível, porque mantém a robustez à rotação do SIFT. Sem GPU, o SIFT é o método clássico mais exato e o mais robusto às quatro transformações.
 
 % ============================================================================
-\section{Resultados e discussão: stitching}
-% Parte 2 (Inês). Enunciado §3 e §5.
+\section{Resultados e discussão: stitching} 
 % ============================================================================
-\nota{(Inês) Pipeline de stitching (os 12 passos do enunciado, sem explicar o código): deteção e
-descrição, matching com ratio test e cross-check (ou LightGlue), homografia RANSAC entre imagens
-adjacentes, composição para a imagem central, canvas, \texttt{warpPerspective} e média dos píxeis na
-sobreposição.}
+
+%As fotografias são lidas por ordem, da esquerda para a direita, e as que têm o lado maior acima de 1000\px{} são reduzidas. Em cada imagem, em níveis de cinzento, detetam-se e descrevem-se até 2000 pontos. Emparelham-se depois os pontos de cada par de imagens adjacentes, com \textit{ratio test} e \textit{cross-check} ou com o \textit{matcher} aprendido, e estima-se com RANSAC a homografia entre elas. As homografias são compostas para levar todas as imagens para o plano da imagem de referência, que por omissão é a central (Secção~\ref{sec:emparelhamento}). 
+
+%O tamanho do panorama obtém-se projetando os quatro cantos de cada imagem e tomando o retângulo que os contém a todos, com uma translação que leva as coordenadas negativas para dentro da imagem. Cada imagem a cores é então deformada para esse \textit{canvas} (\texttt{cv2.warpPerspective}). Nas zonas de sobreposição, o valor de cada píxel é a média das imagens que o cobrem; onde nenhuma imagem chega, o panorama fica a preto.
+
+Em cada sequência de três imagens, detetam-se e emparelham-se os pontos de cada par de imagens adjacentes, estima-se a homografia com RANSAC e compõem-se as homografias até à imagem de referência (Secção~\ref{sec:emparelhamento}). Cada imagem é depois deformada para um \textit{canvas} comum, calculado a partir da projeção dos quatro cantos de cada imagem, e as zonas de sobreposição são
+compostas pela média dos píxeis (Secção~\ref{sec:blending}).
+
 
 \subsection{Configurações comparadas}
+\label{sec:configuracoes}
 \begin{table}[H]
 \centering\small
 \caption{Stitching com seis configurações (dois descritores de vírgula flutuante, um binário e o
@@ -685,23 +746,54 @@ proprio3 & SuperPoint+LightGlue & 759 / 681 & 0,90 & 1,24 & 752 / 690 & 0,92 & 1
 \end{tabular}
 \end{table}
 
+As seis configurações produzem um panorama nos quatro conjuntos, com rácios de \textit{inliers} entre 0,66 e 0,99. Os \textit{matchers} aprendidos obtêm mais \textit{inliers} em seis dos oito pares, com valores muito próximos entre o SuperGlue e o LightGlue, enquanto nos dois pares do keble o KAZE fica à frente. A maior diferença surge no par $2\to3$ do proprio1, dominado por um telhado de telhas repetidas: o SIFT obtém 130 \textit{inliers} em 197 \textit{matches} (rácio 0,66) e o ORB 139 em 202, contra 599 em 629 (0,95) do SuperGlue. Como mostra a Figura~\ref{fig:inliers-stitching}, os \textit{matches} do SIFT no telhado são quase todos \textit{outliers}, porque cada telha tem uma vizinhança quase igual à das vizinhas e os \textit{inliers} concentram-se nas árvores e na beira do telhado. Já o SuperGlue emparelha corretamente as telhas, distribuindo os \textit{inliers} por toda a sobreposição. Com os mesmos pontos e descritores, o SuperPoint+NN fica em 249 \textit{inliers}, o que confirma que a diferença vem do \textit{matcher} (Secção~\ref{sec:hpatches}).
+
+
 \begin{figure}[H]
 \centering
-\begin{subfigure}{0.49\linewidth}\figura{panoramas/keble/SIFT.jpg}\caption{SIFT}\end{subfigure}\hfill
-\begin{subfigure}{0.49\linewidth}\figura{panoramas/keble/SuperPoint-LightGlue.jpg}\caption{SuperPoint+LightGlue}\end{subfigure}
-\caption{Panoramas do conjunto keble, com a imagem central como referência e média dos píxeis na
-sobreposição.}
-\label{fig:panoramas}
+\begin{subfigure}{0.32\linewidth}\figura{figuras/stitching/proprio1/keypoints/SIFT.jpg}\caption{SIFT}\end{subfigure}\hspace{1em}
+\begin{subfigure}{0.32\linewidth}\figura{figuras/stitching/proprio1/keypoints/SuperPoint-SuperGlue.jpg}\caption{SuperPoint}\end{subfigure}
+\caption{Keypoints na imagem de referência do proprio1 ($750\times1000$\px), 2000 pontos em cada
+método. O SIFT concentra-se na folhagem e nas arestas das telhas; o SuperPoint distribui-se de forma
+mais uniforme, incluindo a parte inferior da imagem.}
+\label{fig:keypoints-stitching}
 \end{figure}
 
-\nota{(Inês) Os panoramas estão em \texttt{results/panoramas} e não em \texttt{results/figures}: carregar
-também essa pasta para o Overleaf (aqui assume-se \texttt{panoramas/} ao lado de \texttt{figuras/}; ajustar
-os caminhos). Acrescentar uma figura de keypoints e uma de inliers (\texttt{figuras/stitching/<conjunto>/}).
-Discutir: todas as configurações produzem um panorama em todos os conjuntos; os matchers aprendidos
-(SuperGlue e LightGlue) dão mais inliers em quase todos os pares (por exemplo, 599 e 569 contra 130 do
-SIFT no par $2\to3$ de proprio1), com valores muito próximos entre si; o
-erro de reprojeção dos aprendidos é maior (cerca de 1\px, keypoints ao píxel), sem efeito visível no
-panorama.}
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.49\linewidth}\figura{figuras/stitching/proprio1/inliers_2-3/SIFT.jpg}
+\caption{SIFT: 130 inliers em 197 matches}\end{subfigure}\hfill
+\begin{subfigure}{0.49\linewidth}\figura{figuras/stitching/proprio1/inliers_2-3/SuperPoint-SuperGlue.jpg}
+\caption{SuperPoint+SuperGlue: 599 em 629}\end{subfigure}
+\caption{Par $2\to3$ do proprio1. Verde: inlier do RANSAC (limiar 3\px); vermelho: outlier.
+Mostram-se 150 linhas em cada par.}
+\label{fig:inliers-stitching}
+\end{figure}
+
+Tal como no HPatches (\ref{sec:homografia}), o erro de reprojeção dos inliers é maior nas configurações com SuperPoint (0,93 a 1,24\px) do que no SIFT e no KAZE, pela localização dos pontos ao píxel, sem efeito visível nos panoramas.
+
+%Nos panoramas (Figura~\ref{fig:panoramas}), nenhum desalinhamento visível depende da configuração. Com mais de uma centena de inliers por par, todas estimam uma homografia suficiente. Os defeitos visíveis são comuns a todas as configurações:
+%\begin{itemize}
+%  \item degraus de brilho no céu do proprio3, porque as fotografias têm exposições diferentes e a média não as compensa;
+%  \item costuras na transição entre imagens, por exemplo no pano do proprio1, presentes tanto com SIFT como com SuperPoint+SuperGlue. Resultam da média e da paralaxe, porque as fotografias foram tiradas à mão sem rodar exatamente em torno do centro ótico;
+%  \item linhas finas verticais no keble, nos limites das imagens deformadas, porque a última coluna de cada imagem original é bastante mais escura do que as vizinhas e a média não a atenua;
+%  \item imagens das pontas muito esticadas quando a rotação entre fotografias é grande (proprio3), efeito da projeção num plano (Secção~\ref{sec:referencia}).
+%\end{itemize}
+%Nestes conjuntos, a escolha da configuração afeta sobretudo o número e a distribuição dos inliers, isto é, a margem de segurança da homografia e o custo, mas não o aspeto do panorama final.
+
+Nos panoramas (Figura~\ref{fig:panoramas}), nenhum desalinhamento visível depende da configuração: com mais de uma centena de inliers por par, todas estimam uma homografia suficiente. Os defeitos visíveis, como degraus de brilho e costuras, são comuns a todas as configurações e vêm da composição e da paralaxe (Secção~\ref{sec:blending}) e as imagens das pontas esticadas no proprio3 vêm da projeção num plano (Secção~\ref{sec:referencia}). Nestes conjuntos, a escolha da configuração afeta sobretudo o número e a distribuição dos inliers, isto é, a margem de segurança da homografia e o custo, mas não
+o aspeto do panorama final.
+
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.49\linewidth}\figura{panoramas/keble/SIFT.jpg}\caption{keble, SIFT}\end{subfigure}\hfill
+\begin{subfigure}{0.49\linewidth}\figura{panoramas/keble/SuperPoint-LightGlue.jpg}\caption{keble, SuperPoint+LightGlue}\end{subfigure}\\[6pt]
+\begin{subfigure}{0.49\linewidth}\figura{panoramas/proprio1/SuperPoint-SuperGlue.jpg}\caption{proprio1, SuperPoint+SuperGlue}\end{subfigure}\hfill
+\begin{subfigure}{0.49\linewidth}\figura{panoramas/proprio3/ORB.jpg}\caption{proprio3, ORB}\end{subfigure}
+\caption{Panoramas com a imagem central como referência e média dos píxeis na sobreposição.}
+\label{fig:panoramas}
+\end{figure}
 
 \subsection{Limiar do RANSAC}
 \begin{table}[H]
@@ -733,14 +825,26 @@ Limiar (px) & SIFT & ORB & KAZE & SP+NN & SP+SG & SP+LG & Erro (px) & Desloc. ca
 \label{fig:ransac}
 \end{figure}
 
-\nota{(Inês) Explicar o RANSAC e o papel do limiar (§3.2). Discutir: com limiares pequenos rejeitam-se
-matches corretos (o ruído de localização dos keypoints é da ordem de 1\px; os aprendidos, localizados ao
-píxel, são os mais afetados: rácio 0,17 a 0,5\px); a partir de 3\px{} o rácio estabiliza nos clássicos; no
-SuperPoint+LightGlue chega a 1,00 a 10\px, o que indica que se começam a aceitar matches errados. A
-homografia do SIFT muda pouco (cantos deslocados no máximo 2,4\px) entre 0,5 e 10\px. Justifica os 3\px.
-Figura dos panoramas lado a lado: \texttt{figuras/ransac\_study/panoramas.jpg}.}
+
+O princípio do RANSAC e o papel do limiar foram descritos na Secção~\ref{sec:emparelhamento}. Para isolar o efeito do limiar, usaram-se os mesmos \textit{matches} em todos os limiares, no conjunto keble (Tabela~\ref{tab:ransac} e Figura~\ref{fig:ransac}).
+
+Com limiares pequenos, o RANSAC rejeita \textit{matches} corretos devido ao ruído na posição dos \textit{keypoints}, num grau que depende da precisão da localização. O SIFT e o KAZE, que refinam a posição ao sub-píxel, mantêm cerca de metade dos \textit{matches} a 0,5\px{} (rácios de 0,51 e 0,53), enquanto o ORB e as três configurações com SuperPoint, cujos pontos ficam em posições inteiras ou em níveis reduzidos da pirâmide, descem para 0,17 a 0,20. Nos métodos clássicos, o rácio estabiliza entre 2 e 3\px{}: o SIFT passa de 0,84 para 0,85 e só chega a 0,86 a 10\px{}, ganhando apenas 6 \textit{inliers} em cerca de 500. Nas configurações com SuperPoint, continua a subir até 3\px{} (0,90 a 0,94). Acima deste valor, o SuperGlue e o LightGlue atingem um rácio de 1,00, pelo que o RANSAC deixa de filtrar. Como o keble não tem homografia verdadeira, não é possível saber se os \textit{matches} acrescentados estão errados.
+
+O erro médio de reprojeção cresce com o limiar (no SIFT, de 0,26 para 0,56\px{}) apenas porque se aceitam \textit{inliers} com erros maiores, pelo que não serve sozinho para escolher o limiar. No SIFT, a homografia muda pouco em toda a gama: os cantos deslocam-se no máximo 2,4\px{} em relação à obtida com 3\px{} e não se notam nos panoramas (Figura~\ref{fig:ransac-panoramas}).
+
+Escolheu-se o limiar de 3\px{} por três razões: é o critério de correção de um \textit{match} da Parte~1, pelo que ``\textit{inlier}'' e ``\textit{match} correto'' partilham a mesma tolerância; está no patamar do rácio de  \textit{inliers} em todos os métodos, incluindo os com localização ao píxel; e
+ainda rejeita cerca de 6\,\% dos \textit{matches} dos \textit{matchers} aprendidos, ao contrário dos limiares de 5 e 10\px{}.
+
+
+\begin{figure}[H]
+\centering
+\figura[0.85\linewidth]{figuras/ransac_study/panoramas.jpg}
+\caption{Panoramas do conjunto keble com SIFT, um por limiar do RANSAC (0,5 a 10\px), com a imagem central como referência. No título de cada painel, o número de inliers dos dois pares adjacentes.}
+\label{fig:ransac-panoramas}
+\end{figure}
 
 \subsection{Escolha da imagem de referência}
+\label{sec:referencia}
 \begin{table}[H]
 \centering\small
 \caption{Panorama com cada uma das três imagens como referência (SIFT, mesmas homografias adjacentes):
@@ -774,16 +878,19 @@ proprio3 & 3 & 2 & 20,94 & 1,86 & 1,00 & 6240$\times$5971 \\
 
 \begin{figure}[H]
 \centering
-\figura[0.75\linewidth]{figuras/reference_study/proprio3.jpg}
-\caption{Conjunto proprio3 com cada uma das três imagens como referência (SIFT).}
+\begin{subfigure}{0.40\linewidth}\figura{figuras/reference_study/keble.jpg}\caption{keble}\end{subfigure}\hspace{1.5em}
+\begin{subfigure}{0.28\linewidth}\figura{figuras/reference_study/proprio3.jpg}\caption{proprio3}\end{subfigure}
+\caption{Panoramas com cada uma das três imagens como referência, de cima para baixo: imagem 1, 2 e 3 (SIFT, as mesmas homografias adjacentes). Na referência central, o canvas e as ampliações são os menores; com uma ponta como referência, a imagem oposta é esticada, sobretudo no proprio3.}
 \label{fig:referencia}
 \end{figure}
 
-\nota{(Inês) Explicar a composição de homografias e a acumulação de erro (§3.3). Discutir: a imagem
-central é a melhor referência em todos os conjuntos (canvas menor, ampliações próximas de 1, uma só
-composição). Com uma ponta como referência, a imagem da outra ponta é esticada: no proprio3 fica 21 vezes
-maior e o canvas passa de 3,3 para 36\,Mpx, porque a rotação entre as fotografias é grande e a projeção
-num plano dilata muito os lados. No proprio2 a escolha quase não importa (ampliações até 1,07).}
+A composição de homografias e a acumulação de erro foram descritas na Secção~\ref{sec:emparelhamento}. Para comparar as três referências possíveis, usaram-se as mesmas homografias entre imagens adjacentes (SIFT) e mudou-se apenas a imagem de referência (Tabela~\ref{tab:referencia} e Figura~\ref{fig:referencia}).
+
+A imagem central é a referência mais estável nos quatro conjuntos. Cada imagem chega à referência com uma só homografia e a ampliação de área máxima é a menor em todos os conjuntos (1,17 no keble, 1,05 no proprio1, 1,03 no proprio2 e 1,81 no proprio3). Com uma das pontas como referência, a imagem da ponta oposta exige a composição de duas homografias e fica muito mais deformada. No keble, a sua área quase duplica (ampliação até 1,95) e o canvas cresce cerca de 50\,\% (de 1,0 para 1,5\,Mpx). O panorama fica também inclinado, porque toda a cena é vista no plano de uma imagem lateral (Figura~\ref{fig:referencia}).
+
+O efeito depende da rotação entre fotografias. No proprio2, com pouca rotação, a escolha quase não importa: as ampliações não passam de 1,07 e os três canvas diferem menos de 4\,\%. No proprio3, com a maior rotação, a imagem da ponta oposta fica cerca de 21 vezes maior. Ao projetar num plano, os pontos que se afastam do eixo ótico da referência são deslocados cada vez mais. Com a imagem central, as duas pontas ficam a meia distância angular e a dilatação mantém-se moderada (1,81). Além do tamanho, uma imagem tão ampliada perde resolução: os seus píxeis são interpolados sobre uma área muito maior e o resultado fica desfocado.
+
+Nestes conjuntos de três imagens, a acumulação de erro não produz desalinhamentos visíveis com nenhuma referência. O efeito dominante da escolha é a distorção geométrica das imagens afastadas da referência e não o erro das homografias compostas. A imagem central reduz ambos, porque nenhuma imagem precisa de mais do que uma homografia.
 
 \subsection{Força bruta e vizinho aproximado}
 \begin{table}[H]
@@ -808,45 +915,55 @@ ORB & força bruta & 14,6 & 360 & 312 & 1,000 & 0,00 & 0,00 \\
 \end{tabular}
 \end{table}
 
-\nota{(Inês) Discutir: com 2000 pontos por imagem, a força bruta é 2 a 5 vezes mais rápida que o FLANN,
-porque o tempo do FLANN inclui construir o índice (duas vezes, por causa do cross-check) e a força bruta
-do OpenCV é muito otimizada; o FLANN só compensa com muitos mais pontos ou com o índice reutilizado. Os
-resultados são quase iguais nos descritores de vírgula flutuante (98,5\,\% dos matches em comum, cantos
-deslocados menos de 1\px{} na mediana); no ORB, o LSH perde mais (95,5\,\% em comum, até 26\px{} de
-deslocamento num par do proprio3). Justifica a força bruta usada em todo o trabalho.}
+Para comparar a pesquisa exata com a aproximada, mudou-se apenas a pesquisa de vizinhos, mantendo os mesmos descritores, o mesmo ratio test e o mesmo cross-check. No FLANN usaram-se 5 KD-trees e 50 verificações nos descritores de vírgula flutuante e LSH com 6 tabelas, chaves de 12 bits e \textit{multi-probe} de nível 1 no ORB (Tabela~\ref{tab:flann}).
+
+Com 2000 pontos por imagem, a força bruta é mais rápida do que o FLANN. O tempo do FLANN inclui a construção do índice, que se faz duas vezes por par, uma em cada sentido, por causa do cross-check. A força bruta do OpenCV, por seu lado, é uma pesquisa exaustiva muito otimizada. Com este número de pontos, o custo de construir o índice não é compensado pela pesquisa mais rápida. O FLANN só traria vantagem com muitos mais pontos ou com um índice reutilizado em várias pesquisas.
+
+Nos descritores de vírgula flutuante, os resultados são quase iguais: 98,5\,\% dos matches do FLANN coincidem com os da força bruta, o número de inliers praticamente não muda e os cantos da homografia deslocam-se 0,5 e 0,8\px{} na mediana. No ORB, o LSH perde mais (95,5\,\% de matches em comum, 3,3\px{} de deslocamento na mediana), porque a pesquisa por tabelas de hash nos descritores binários é menos fiel ao vizinho exato do que as KD-trees. Por ser exata e com este número de pontos mais rápida, a força bruta foi usada em todas as experiências.
+
 
 \subsection{Blending}
-\nota{(Inês) A composição usada é a média dos píxeis na sobreposição (baseline do enunciado, §3.4).
-Referir que não foi implementada uma alternativa (feathering, multibanda), ou implementá-la.}
+\label{sec:blending}
+
+Em todos os panoramas, a composição é a média dos píxeis na sobreposição. Cada imagem é deformada para o \textit{canvas} juntamente com uma máscara de uns, deformada com a mesma interpolação. Em cada píxel, o valor final é a soma das imagens a dividir pela soma das máscaras. Os píxeis das bordas, que a interpolação mistura com o fundo vazio, são normalizados pelo peso correspondente e não escurecem o panorama.
+
+A média é simples, mas tem três limitações visíveis nos panoramas da Secção~\ref{sec:configuracoes}:
+\begin{itemize}
+  \item não compensa diferenças de exposição: no proprio3, a passagem de uma para duas imagens na sobreposição cria degraus de brilho no céu;
+  \item onde a homografia não alinha exatamente as imagens, por paralaxe nas fotografias tiradas à mão, a média sobrepõe as duas versões e cria costuras ou contornos duplicados;
+  \item cada píxel de uma imagem pesa o mesmo até à borda, pelo que os defeitos da borda passam para o panorama. Nas imagens do keble, a última coluna é bastante mais escura do que as vizinhas e isso aparece como as linhas finas verticais visíveis no panorama.
+\end{itemize}
+
+% Não foi implementada uma composição alternativa. Um \textit{feathering}, em que o peso de cada píxel diminui com a distância à borda da imagem, suavizaria as transições de exposição e eliminaria as linhas das bordas. O \textit{blending} multibanda, que combina as baixas frequências numa zona larga e as altas numa zona estreita, reduziria também os contornos duplicados. Nenhum dos dois corrige a paralaxe, que exigiria fotografias tiradas a rodar a câmara em torno do centro ótico.
 
 % ============================================================================
-\section{Conclusão}
-% Enunciado §9d: 0,75 a 1 página. Problemas por resolver, limitações, direções futuras.
+\section{Conclusão} 
 % ============================================================================
-\nota{(ambas) Conclusões principais; limitações dos métodos e do nosso estudo (por exemplo: teste sintético
-com uma só imagem; tempos dependentes do estado da máquina; BRIEF sem orientação nem escala); direções
-futuras.}
+Este trabalho permitiu avaliar detetores, descritores locais e métodos de emparelhamento clássicos e baseados em aprendizagem profunda, considerando alterações de iluminação, ponto de vista, rotação e escala. Os resultados mostram que o desempenho depende da interação entre a deteção, a descrição e o matching, não sendo suficiente avaliar um método apenas pelo número de keypoints detetados. A robustez de cada método decorre da sua construção: sem orientação no descritor (BRIEF, SuperPoint), a rotação faz falhar o emparelhamento e sem escala no detetor (FAST), falha a escala; nos dois casos os pontos continuam a ser detetados, pelo que a falha está no descritor e não no detetor. Na comparação dos descritores BRIEF, observou-se que a estratégia de amostragem afeta os resultados, mas não elimina as limitações perante transformações geométricas para as quais o descritor não foi concebido.
+
+A comparação controlada das configurações baseadas no SuperPoint evidenciou a importância do \textit{matcher} na recuperação de correspondências. Com os mesmos pontos e descritores, o SuperGlue e o LightGlue quase duplicaram o recall do vizinho mais próximo e o LightGlue obteve exatidão semelhante à do SuperGlue com cerca de um sétimo do tempo de emparelhamento. Para tempo real sem GPU, o ORB revelou o melhor compromisso; quando a exatidão é a prioridade, o SuperPoint+LightGlue, ou o SIFT+LightGlue se houver rotações grandes. A avaliação da homografia mostrou ainda que um rácio elevado de inliers não garante por si só uma transformação próxima da referência geométrica.
+
+Na construção de panoramas, a configuração de matching alterou sobretudo o número de inliers, isto é, a margem de segurança da homografia e não o aspeto final, cujos defeitos vieram da composição por média e da paralaxe. A imagem central revelou-se a melhor referência, sobretudo com rotações grandes entre fotografias, e, com cerca de 2000 pontos por imagem, a pesquisa aproximada (FLANN) foi mais lenta do que a força bruta, sem ganho de qualidade.
+
+
+Em conjunto, as experiências demonstram a importância de uma avaliação que combine métricas quantitativas, análise geométrica e inspeção visual. Como limitações, destacam-se a utilização de uma única imagem nos testes sintéticos, panoramas de apenas três imagens e sem homografia verdadeira e tempos medidos em CPU para os métodos clássicos e em GPU para os aprendidos, que não são diretamente comparáveis. Como extensões, propõem-se uma composição com \textit{feathering} ou multibanda, a avaliação de métodos aprendidos mais recentes e a medição de todos os métodos no mesmo hardware.
+
 
 % ============================================================================
 %  REFERÊNCIAS
 % ============================================================================
+\newpage
 \begin{thebibliography}{99}
 \bibitem{lowe2004} D.~Lowe, ``Distinctive Image Features from Scale-Invariant Keypoints,''
 \emph{International Journal of Computer Vision}, 60(2), pp.~91--110, 2004.
-\bibitem{bay2008} H.~Bay, A.~Ess, T.~Tuytelaars, L.~Van Gool, ``SURF: Speeded Up Robust Features,''
-\emph{Computer Vision and Image Understanding}, 110(3), pp.~346--359, 2008.
 \bibitem{rosten2006} E.~Rosten, T.~Drummond, ``Machine Learning for High-Speed Corner Detection,''
 \emph{ECCV}, 2006.
-\bibitem{rosten2010} E.~Rosten, R.~Porter, T.~Drummond, ``Faster and Better: A Machine Learning Approach
-to Corner Detection,'' \emph{IEEE TPAMI}, 32, pp.~105--119, 2010.
 \bibitem{alcantarilla2012} P.~F.~Alcantarilla, A.~Bartoli, A.~J.~Davison, ``KAZE Features,''
 \emph{ECCV}, 2012.
 \bibitem{rublee2011} E.~Rublee, V.~Rabaud, K.~Konolige, G.~Bradski, ``ORB: An Efficient Alternative to
 SIFT or SURF,'' \emph{ICCV}, 2011.
 \bibitem{calonder2010} M.~Calonder, V.~Lepetit, C.~Strecha, P.~Fua, ``BRIEF: Binary Robust Independent
 Elementary Features,'' \emph{ECCV}, pp.~778--792, 2010.
-\bibitem{calonder2012} M.~Calonder, V.~Lepetit, M.~Özuysal, T.~Trzcinski, C.~Strecha, P.~Fua, ``BRIEF:
-Computing a Local Binary Descriptor Very Fast,'' \emph{IEEE TPAMI}, 34(7), pp.~1281--1298, 2012.
 \bibitem{leutenegger2011} S.~Leutenegger, M.~Chli, R.~Siegwart, ``BRISK: Binary Robust Invariant Scalable
 Keypoints,'' \emph{ICCV}, 2011.
 \bibitem{alahi2012} A.~Alahi, R.~Ortiz, P.~Vandergheynst, ``FREAK: Fast Retina Keypoint,'' \emph{CVPR}, 2012.
@@ -860,8 +977,7 @@ Detection and Description,'' \emph{CVPR Workshops}, 2018.
 Matching with Graph Neural Networks,'' \emph{CVPR}, 2020.
 \bibitem{lindenberger2023} P.~Lindenberger, P.-E.~Sarlin, M.~Pollefeys, ``LightGlue: Local Feature Matching
 at Light Speed,'' \emph{ICCV}, 2023.
-\bibitem{szeliski2022} R.~Szeliski, \emph{Computer Vision: Algorithms and Applications}, 2.\textordfeminine{}
-ed., Springer, 2022.
+\bibitem{assignment1} DEEC - Universidade de Coimbra, ``Assignment \#1: Keypoint Detectors, Feature Descriptors and Applications,'' \emph{Artificial Intelligence for (Advanced) Computer Vision (2026/27 Edition)}, 2026.
 \end{thebibliography}
 
 % ============================================================================
@@ -869,17 +985,7 @@ ed., Springer, 2022.
 % ============================================================================
 \appendix
 
-\section{Resultados complementares}
-\nota{(ambas) Figuras e tabelas que não cabem no corpo: keypoints e matches dos restantes métodos, curvas
-das outras métricas (recall, matching score, repetibilidade por nível), curvas do BRIEF implementado.
-Estão em \texttt{figuras/qualitative}, \texttt{figuras/curves} e \texttt{figuras/curves\_brief}, com
-legendas prontas nos ficheiros \texttt{legendas.md} de cada pasta.}
-
-\section{Utilização de ferramentas de inteligência artificial}
-\nota{(ambas) Rever este texto e adaptá-lo às regras da cadeira. Proposta:}
-O código, a documentação técnica e as verificações da Parte~1 foram desenvolvidos com a assistência do
-Claude Code (Anthropic), modelo Claude Opus 5.5, em outubro de 2026. As decisões de protocolo, as
-justificações e as verificações feitas estão registadas nos ficheiros \texttt{DECISOES.md},
-\texttt{VERIFICACOES.md} e \texttt{FONTES.md} entregues com o código.
+\section{Utilização de ferramentas de inteligência artificial} 
+O código, a documentação técnica e posteriores verificações foram desenvolvidos com a assistência do Claude Code (Anthropic).
 
 \end{document}

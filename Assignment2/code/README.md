@@ -14,8 +14,25 @@ Run the commands below from the project root, the directory containing
 
 Create the project environment from the included `env.yml` file:
 
+On Linux, run:
 ```bash
 conda env create -f env.yml
+```
+
+On Windows, download the `wheel` folder from the OneDrive materials and copy it
+to the project root. It should contain:
+
+```text
+wheel/cyvlfeat-0.7.1-cp311-cp311-win_amd64.whl
+```
+
+Then run:
+```bash
+conda env create -f env-win.yml
+```
+
+Then
+```
 conda activate cvc-a2
 ```
 

@@ -1,0 +1,9 @@
+name: cvc-a2
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    - wheel/cyvlfeat-0.7.1-cp311-cp311-win_amd64.whl

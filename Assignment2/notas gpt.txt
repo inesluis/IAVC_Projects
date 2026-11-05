@@ -1,0 +1,271 @@
+------------- Stage A — Prepare the data and build BoVW -------------
+
+O que melhoraria:
+- A inspeção visual apresenta seis imagens positivas por categoria e seis imagens de background. Está bem, mas seria interessante garantir que os exemplos representam alguma diversidade de escala, perspetiva, iluminação e contexto.
+- Não tens uma análise escrita das imagens. Tens as imagens, mas falta explicar brevemente o que observaste.
+- Deves explicar que os histogramas 2×2 têm dimensão 4K, enquanto os globais têm dimensão K.
+
+------------- Stage B — Train a motorbike classifier -------------
+
+O que melhoraria:
+
+Há um pormenor na tua discussão: dizes que os exemplos mais bem classificados podem estar associados a padrões de background/contexto.
+
+É uma hipótese válida, mas deves apresentar uma observação concreta das imagens e da visualização dos visual words.
+
+Não basta dizer que pode acontecer. Explica o que efetivamente observaste.
+
+Por exemplo:
+- Existem padrões visuais comuns entre as imagens positivas?
+- O classificador parece dar importância ao próprio objeto?
+- Existem padrões do contexto que também aparecem nas imagens positivas?
+Não inventes conclusões se a visualização não permitir responder.
+
+------------- Stage C — Test and evaluate retrieval -------------
+
+Respondeste corretamente à pergunta sobre o bias \(b\).
+
+A explicação está correta: para um classificador fixo, adicionar a mesma constante a todos os scores não altera a ordenação das imagens. Consequentemente, não altera AP nem a curva Precision-Recall.
+
+Um pormenor importante:
+
+No teu texto indicas que o classificador, usando threshold 0, não identifica nenhuma motorbike.
+
+Isto não significa que o classificador não consiga recuperar motorbikes. Significa apenas que o threshold utilizado não é adequado para essa decisão binária.
+
+É precisamente por isso que AP é uma métrica importante neste problema.
+
+------------- Stage D — Other categories -------------
+
+O que está menos bem:
+
+As matrizes de confusão foram calculadas para o modelo baseline com L2 normalization.
+
+Posteriormente, na Stage F, selecionaste Hellinger como configuração final, mas não apresentaste as matrizes de confusão dessa configuração.
+
+Isto deixa uma pequena inconsistência: tens resultados de ranking finais, mas as métricas de classificação com threshold continuam associadas ao baseline.
+
+Como corrigir:
+
+Na Stage F, depois de avaliares a configuração final, acrescenta uma célula que calcule as matrizes de confusão e as métricas de classificação para as cinco categorias, também com threshold 0.
+
+Assim, terás:
+- Resultados do baseline L2.
+- Resultados da configuração final Hellinger.
+Podes comparar as duas configurações de forma completa.
+
+Outra observação: a tua explicação sobre a relação entre número de exemplos e AP é razoável, mas não demonstra causalidade. O número de exemplos não é o único fator que influencia o resultado. A diversidade visual, a dificuldade das imagens e a distribuição dos backgrounds também podem contribuir.
+
+------------- Stage E — Normalization and spatial information -------------
+
+O que melhoraria:
+
+A pergunta sobre se existe uma correlação entre classificação e L2 normalization é respondida sobretudo através de AP.
+
+Podes explicitar que, neste problema, uma melhoria na qualidade do ranking (AP) não implica necessariamente uma melhoria equivalente na classificação a um threshold fixo.
+
+É especialmente importante porque tens classes muito desequilibradas.
+
+Também deves ter cuidado com a afirmação de que retirar informação espacial ajuda algumas classes e prejudica outras. No teu código, essa comparação foi realizada para motorbike, não para todas as categorias.
+
+A tua discussão reconhece parcialmente essa limitação. Mantém essa ressalva.
+
+------------- Stage F — Hellinger feature map -------------
+
+O problema está na explicação da experiência.
+
+No teu texto afirmas:
+The square root alone (0.600 tiling) is much worse than the full map (0.783), so the normalization after the root matters.
+
+Esta conclusão não está correta.
+
+O motivo é que a função sqrt_only faz apenas:
+np.sqrt(x)
+
+
+
+Enquanto a função Hellinger faz:
+np.sqrt(l1norm(x))
+
+
+
+Portanto, estás a comparar:
+- Square root sobre histogramas não normalizados.
+- L1 normalization antes de aplicar square root.
+Não estás a isolar o efeito da L2 normalization depois da raiz.
+
+Aliás, para um histograma não negativo L1-normalizado:
+\[
+\left\|\sqrt{\mathbf h}\right\|_2^2
+=\sum_i h_i=1
+\]
+
+Logo, a L2 normalization posterior é matematicamente redundante, salvo diferenças numéricas.
+
+Como corrigir:
+
+Altera a explicação para dizer que a melhoria resulta sobretudo da normalização L1 antes da aplicação da raiz quadrada.
+
+Se quiseres demonstrar experimentalmente que a L2 posterior é redundante, compara:
+def hellinger_without_final_l2(x):    return np.sqrt(l1norm(x))def hellinger(x):    return l2norm(np.sqrt(l1norm(x)))
+
+Os resultados devem ser praticamente iguais.
+
+Esta é uma correção importante, porque o enunciado pergunta especificamente sobre a ordem das normalizações.
+
+------------- Stage G — Vary the number of training images -------------
+
+Uma ressalva metodológica:
+
+O valor de C é selecionado utilizando o conjunto de treino completo e a validação, sendo depois mantido nas experiências com diferentes frações de treino.
+
+Isto é aceitável se o objetivo for estudar o efeito da quantidade de dados mantendo C fixo. Contudo, deves explicar essa decisão no relatório.
+
+Também é correto reconhecer que, com 100% dos dados, o desvio-padrão é muito pequeno e não representa uma avaliação da variabilidade associada a diferentes amostras de treino.
+
+------------- Stage H — VLAD -------------
+
+O que está menos bem:
+1. Não apresentas Precision@K e Recall@K para VLAD, apesar de teres feito essa avaliação para BoVW.
+2. Não apresentas uma comparação quantitativa de imagens recuperadas entre BoVW e VLAD.
+3. Não experimentaste intra-normalization ou power normalization.
+O terceiro ponto não é propriamente um erro, porque o enunciado apresenta a normalização adicional como opcional.
+
+Como melhoraria:
+
+Acrescentaria P@5, P@10, P@20 e P@50 para motorbike, pelo menos para VLAD e FV.
+
+Assim, consegues comparar a qualidade da recuperação das imagens de forma mais completa.
+
+------------- Stage I — Fisher Vector -------------
+
+Há um pormenor que deves verificar.
+
+O enunciado indica que, para Fisher Vectors com covariância diagonal, a dimensão é:
+\[
+2Kd
+\]
+
+Considerando quatro tiles:
+\[
+4\times2\times32\times80=20480
+\]
+
+No teu notebook aparece:
+\[
+4\times(2\times32\times80+32)=20608
+\]
+
+Ou seja, estás a incluir mais 32 dimensões por tile.
+
+Isto pode acontecer porque a implementação também inclui os gradientes associados aos pesos dos componentes do GMM.
+
+Não significa necessariamente que a implementação esteja errada. Mas tens de verificar o que está efetivamente a ser codificado.
+
+Como corrigir:
+- Confirma a estrutura do encoder FV.
+- Identifica o que representam as 32 dimensões adicionais.
+- Explica no notebook e no relatório porque é que a dimensão real difere da fórmula simplificada do enunciado.
+Não alteres a dimensão artificialmente só para obter 20480. Primeiro confirma a implementação.
+
+Não deves simplesmente concluir que VLAD é muito superior a BoVW sem considerar a normalização.
+
+O que tens de corrigir aqui:
+
+Encontrei uma inconsistência entre a tabela de resultados da célula 33 e a discussão da célula 40. Valores não coincidem. Correção obrigatória: atualiza a discussão com os valores efetivamente apresentados pela execução da célula 33, ou volta a executar a experiência e atualiza ambas as secções com os novos valores.
+
+A mesma questão aplica-se à dimensão e ao armazenamento: deves apresentar os valores reais da implementação e explicar que o armazenamento é uma estimativa baseada em vetores float32.
+
+Outra melhoria: os tempos de encoding são calculados com apenas dez imagens. Não é necessariamente errado, mas é uma amostra pequena. Se possível, aumenta o número de imagens ou repete a medição e apresenta uma média.
+
+
+------------- Parte 3 — Large visual vocabularies with PCA vs smaller vocabularies -------------
+
+Problema 1 — Comparação entre PCA e pequeno vocabulário
+Esta é a principal limitação da Parte 3.
+
+Comparaste:
+- K=1024 + PCA(256), com tiling 2×2.
+- K=256 global, sem tiling.
+Embora tenham a mesma dimensão final, não têm exatamente a mesma representação espacial.
+
+O primeiro mantém informação espacial através dos quatro tiles. O segundo elimina essa informação.
+
+Portanto, não consegues atribuir toda a diferença de desempenho exclusivamente à utilização de um vocabulário maior seguido de PCA.
+
+O próprio notebook reconhece esta limitação, o que é positivo.
+
+Como corrigiria:
+
+A experiência ideal seria construir um vocabulário K=64 com tiling 2×2:
+\[
+4\times64=256
+\]
+
+Assim, terias:
+Método	Dimensão	Informação espacial
+K=1024 + PCA(256)	256	2×2
+K=64 sem PCA	256	2×2
+
+Esta seria uma comparação muito mais justa.
+
+Se não for viável construir K=64, podes manter a experiência atual. Mas no relatório tens de deixar muito claro que a conclusão é limitada pela diferença de representação espacial.
+
+Não afirmes categoricamente que o vocabulário grande com PCA é superior ao pequeno vocabulário.
+Problema 2 — Valores inconsistentes na discussão
+Também encontrei diferenças entre os resultados efetivos da célula 36 e os valores escritos na célula 41.
+
+Os valores de mAP estão apenas ligeiramente arredondados, mas os tempos não coincidem.
+Condição	SVM train na execução	SVM train na discussão
+K=256	0.39 s	0.33 s
+K=512	0.64 s	0.57 s
+K=1024	1.22 s	1.16 s
+PCA 128	0.44 s	0.38 s
+PCA 256	0.43 s	0.44 s
+
+E os tempos de ajuste de PCA:
+PCA	Execução	Discussão
+128	1.35 s	0.64 s
+256	1.21 s	0.88 s
+
+Correção obrigatória: atualiza a tabela e a discussão com os resultados da execução atual.
+Problema 3 — Custos computacionais incompletos
+O enunciado pede também que analises:
+- Codebook fitting time.
+- Feature encoding time.
+- PCA fitting time.
+- Classifier training time.
+- Inference time.
+- Feature storage.
+No teu notebook mediste os tempos de PCA, treino SVM e inferência para as condições da Parte 3.
+
+Mas não mediste os tempos de construção dos vocabulários K=256, 512 e 1024, nem os tempos de encoding específicos de cada condição.
+
+Na discussão reconheces que esses tempos foram medidos offline e não foram novamente registados.
+
+Isto é uma limitação, não um erro de implementação.
+
+Como corrigir:
+
+Se ainda tiveres acesso aos tempos originais de construção dos encoders, regista-os.
+
+Caso contrário, indica explicitamente que não foram medidos e não inventes valores.
+Problema 4 — Interpretação de Accuracy e Macro-F1
+Fizeste bem em incluir estas métricas:
+Condição	mAP	Macro-F1	Accuracy
+K=256	0.6898	0.3513	0.8506
+K=512	0.7129	0.3597	0.8524
+K=1024	0.7308	0.3785	0.8555
+PCA 128	0.6946	0.4055	0.8596
+PCA 256	0.7096	0.3356	0.8522
+
+A tua observação de que Accuracy é influenciada pelo desequilíbrio entre positivos e negativos está correta.
+
+É importante explicares no relatório que uma Accuracy de aproximadamente 85% não significa que o modelo tenha um bom desempenho a identificar todas as categorias.
+
+O Macro-F1 é bastante mais baixo, e algumas classes apresentam Recall reduzido com threshold 0.
+
+Também deves distinguir claramente duas coisas:
+- mAP mede a qualidade da ordenação.
+- Macro-F1 mede a qualidade da classificação a um determinado threshold.
+Não são métricas diretamente equivalentes.

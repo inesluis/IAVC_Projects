@@ -63,6 +63,9 @@ installation or execution does not work on your machine, edit
 │   ├── extract.py              # Extract embeddings using a trained encoder.
 │   ├── encoders.py             # Encoder implementations and image aggregation.
 │   ├── deep_models.py          # Pretrained models and intermediate features.
+│   ├── extract_deep.py         # Cache frozen ResNet/ViT/DINOv2/CLIP features.
+│   ├── evaluate.py             # Part 4: SVM/C selection, AP, few-shot, CLIP, maps.
+│   ├── retrieval.py            # Part 5: corpus/queries, similarity ranking, P@K/R@K/AP.
 │   ├── features.py             # Image preparation and dense SIFT/PHOW features.
 │   ├── utils.py                # Dataset tables, splits, and SVM helpers.
 │   └── visualization.py        # Ranking, precision-recall, and embedding plots.
@@ -70,7 +73,12 @@ installation or execution does not work on your machine, edit
 ├── make_splits.py              # Builds data/splits/splits.json.
 ├── 1_handcraft.ipynb           # Hand-crafted feature experiments.
 ├── 2_deep_models.ipynb         # Deep-model features and CAM visualization.
+├── 3_part4_pretrained.ipynb    # Part 4, Stages A-F + comparison table.
+├── 4_part5_retrieval.ipynb     # Part 5, retrieval challenge (Stages A-C).
 ```
+
+Part 4 outputs (CSV tables and figures) are written to `results/part4/`;
+Part 5 outputs to `results/part5/`.
 
 Encoder files are named `<ENCODER>_K<K>_C<C>.npz`, where `K<K>` is the number of
 visual words or GMM components and `C<C>` is the PCA dimension. `C0` means PCA
@@ -282,3 +290,18 @@ projects:
 
 These models may download pretrained weights the first time they are loaded.
 The notebook automatically selects CUDA when available and otherwise uses CPU.
+
+## Part 5 — Retrieval challenge
+
+`4_part5_retrieval.ipynb` ranks the test images by similarity to motorbike
+queries (train images) or to CLIP text prompts. It needs the cached features of
+Parts 1-4 plus BoVW with K = 256 and 1024 for the vocabulary-size question:
+
+```bash
+python -m src.train -e bovw -k 256 -c 0   --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encoders
+python -m src.extract -e ../data/encoders/bovw_K256_C0.npz   --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encodings/ --cache-dir ""
+# repeat with -k 1024 / bovw_K1024_C0.npz
+```
+
+If those folders are missing, the notebook runs with K = 512 only.
+Details: `../docs/Parte5_implementacao.md`.

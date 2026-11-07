@@ -1,12 +1,5 @@
 """Evaluation helpers for Part 4 (pretrained representations).
 
-Protocol (same as Part 1):
-  * one binary task per class: positives = images that contain the class,
-    negatives = background images;
-  * every feature vector is L2-normalised;
-  * C is chosen on the validation AP, the SVM is trained on train only and
-    evaluated once on test.
-
 The binary SVMs cannot be compared across classes (each one has its own C and
 never saw the other classes), so the confusion matrix uses a separate
 multi-class SVM with 5 classes + background (evaluate_multiclass).
@@ -85,15 +78,24 @@ def load_splits():
         return json.load(f)
 
 
+HELLINGER = "_hellinger"   # suffix: Hellinger map of a BoVW feature (Part 1 final setup)
+
+
 def has_feature(feature):
     """True if the feature was extracted for train, val and test."""
-    folder = DATA / "encodings" / feature
+    folder = DATA / "encodings" / feature.removesuffix(HELLINGER)
     return all((folder / f"background_{s}.npz").exists() for s in ("train", "val", "test"))
 
 
 @lru_cache(maxsize=None)
 def load_split(feature, subset):
-    """Read all <class>_<subset>.npz files of a feature into one Split."""
+    """Read all <class>_<subset>.npz files of a feature into one Split.
+
+    "<bovw feature>_hellinger" gives the Hellinger map used in Part 1:
+    L1 normalisation, square root, then L2.
+    """
+    hellinger = feature.endswith(HELLINGER)
+    feature = feature.removesuffix(HELLINGER)
     labels = load_splits()[subset]                 # image id -> list of classes
     vectors = {}                                   # image id -> feature vector
     for cat in CLASSES + ["background"]:
@@ -104,6 +106,8 @@ def load_split(feature, subset):
     X = np.stack([vectors[n] for n in names]).astype(np.float32)
     Y = np.array([[c in labels[n] for c in CLASSES] for n in names])
     bg = np.array(["background" in labels[n] for n in names])
+    if hellinger:
+        X = np.sqrt(np.maximum(X, 0) / np.maximum(X.sum(1, keepdims=True), 1e-12))
     return Split(l2norm(X), names, Y, bg)
 
 

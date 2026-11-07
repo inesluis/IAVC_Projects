@@ -2,30 +2,8 @@
 
 Each image is passed through the network once; the features are then written
 in the same format as the handcrafted encodings, so `utils.loadEncodingSubset`
-and the SVM/AP code work unchanged:
+and the SVM/AP code work unchanged
 
-    data/encodings/<feature>/<category>_<train|val|test>.npz
-        file_names : (N,)   image names without extension
-        histograms : (N, D) float32 features (not normalised)
-
-Features written (D):
-    resnet18_layer2 (128), resnet18_layer3 (256), resnet18_layer4 (512)
-        global average pooling of blocks layer2.1 / layer3.1 / layer4.1
-    vit_b_32 (768)                 CLS token, supervised ImageNet ViT-B/32
-    dinov2_vits14 (384)            normalised CLS token
-    dinov2_vits14_patchmean (384)  mean of the normalised patch tokens
-    clip_vit_b_32 (512)            CLIP image embedding
-
-With flips enabled, the same features are also computed on the horizontally
-mirrored image and saved under "<feature>_flip" (for Part 4, Stage C).
-
-Each output folder gets a meta.json with the model, preprocessing, dimension,
-hardware and time per image. A summary row per feature is appended to
-results/deep_extraction.csv.
-
-Usage (from code/):
-    python -m src.extract_deep                      # all models, original + flip
-    python -m src.extract_deep -m dinov2_vits14 --limit 64   # quick test
 """
 import argparse
 import csv

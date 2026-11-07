@@ -3,15 +3,6 @@
 Target category: motorbike. No classifier is trained: every method turns the
 query and the corpus images into vectors and ranks the corpus by similarity.
 
-Protocol
-  * query pool   = motorbike images of the TRAIN split (minus near-duplicates
-                   of corpus images);
-  * val corpus   = all VAL images      -> used to choose normalisation, K,
-                   PCA dimension and CLIP prompt;
-  * test corpus  = all TEST images     -> final numbers, same for every method;
-  * relevant     = the image contains a motorbike (splits.json labels, so
-                   multi-label images such as "motorbike + person" count).
-
 Features are read from data/encodings/<feature>/<class>_<subset>.npz, the same
 cache used by Parts 1-4 (BoVW/VLAD/FV from src.extract, deep features from
 src.extract_deep).

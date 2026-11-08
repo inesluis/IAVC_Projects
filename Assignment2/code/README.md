@@ -1,307 +1,194 @@
-# Image Encoding Assignment
+# IACV Assignment #2 — Object Recognition and Image Retrieval
 
-This project trains visual encoders from local image descriptors and extracts
-one global embedding per image. The supported encoders are:
+**Group:** _Carolina Gonçalves (2022221124)_, _Inês Luís (2022216107)_
 
-- **BoVW**: a histogram of visual-word assignments.
-- **VLAD**: aggregated residuals to visual-word centers.
-- **Fisher vector**: first- and second-order statistics from a GMM.
+This folder contains the code for all five parts of the assignment:
 
-Run the commands below from the project root, the directory containing
-`README.md`.
+| Part | Topic | Where |
+|------|-------|-------|
+| 1 | BoVW + linear SVM | `1_handcraft_final.ipynb` |
+| 2 | VLAD and Fisher vectors | `1_handcraft_final.ipynb` |
+| 3 | Pretrained CNN/ViT features and CAM | `2_deep_models.ipynb` |
+| 4 | Pretrained representations (ResNet, ViT, DINOv2, CLIP) | `3_part4_pretrained.ipynb` |
+| 5 | Retrieval challenge (motorbike) | `4_part5_retrieval.ipynb` |
 
-## Install Anaconda Environment
+All commands below are run **from this directory (`code/`)**. The dataset lives
+one level up, in `../data/`.
 
-Create the project environment from the included `env.yml` file:
+---
 
-On Linux, run:
+## 1. Environment
+
+Tested with **Python 3.11** (conda), on Windows 11 and Linux, with an NVIDIA GPU
+(CUDA 13.0). Everything also runs on CPU, but deep-feature extraction is much
+slower.
+
+On Linux:
 ```bash
 conda env create -f env.yml
 ```
 
-On Windows, download the `wheel` folder from the OneDrive materials and copy it
-to the project root. It should contain:
-
-```text
-wheel/cyvlfeat-0.7.1-cp311-cp311-win_amd64.whl
-```
-
-Then run:
+On Windows, `cyvlfeat` has no conda build, so a prebuilt wheel is used. Copy the
+`wheel/` folder (course OneDrive materials) to `code/`, so that
+`wheel/cyvlfeat-0.7.1-cp311-cp311-win_amd64.whl` exists, then:
 ```bash
 conda env create -f env-win.yml
 ```
 
-Then
-```
-conda activate cvc-a2
-```
-
-Install the Python packages listed in `requirements.txt`:
-
+Then, on both systems:
 ```bash
+conda activate cvc-a2
 python -m pip install -r requirements.txt
 ```
 
-The requirements file is configured for CUDA 12.6 PyTorch by default. If CUDA
-installation or execution does not work on your machine, edit
-`requirements.txt`: comment out the CUDA lines and uncomment the CPU-only
-`torch` and `torchvision` lines, then rerun the installation command.
+`requirements.txt` installs the **CUDA 13.0** builds of PyTorch. If CUDA does
+not work on your machine, comment out the CUDA lines, uncomment the CPU-only
+`torch`/`torchvision` lines and run the install again.
 
+Dependency files:
 
-## Project Structure
+- `env.yml` / `env-win.yml`: Python 3.11, pip, `cyvlfeat` 0.7.1.
+- `requirements.txt`: PyTorch, torchvision, OpenCV, scikit-learn, scikit-image,
+  pandas, matplotlib, tqdm, CLIP, etc. (pinned versions).
+
+The first run of Parts 3–5 downloads pretrained weights (TorchVision, DINOv2
+through `torch.hub`, CLIP), so an internet connection is needed.
+
+> **Windows note.** `cv2.imread` fails on absolute paths with non-ASCII
+> characters (e.g. `2º Ano`). The scripts therefore use relative paths
+> (`../data/...`); keep running them from `code/`.
+
+## 2. Dataset
+
+Extract `data.zip` (course materials) into `../data/`, giving:
 
 ```text
-.
-├── data/
-│   ├── images/                 # Dataset images.
-│   ├── splits/                 # Original *_train.txt / *_val.txt files
-│   │   └── splits.json         #   + train/val/test split (make_splits.py).
-│   ├── encoders/               # Trained encoder configurations (*.npz).
-│   └── encodings/              # Per-image embeddings grouped by encoder.
+data/
+├── images/      # all images (.jpg)
+└── splits/      # original <class>_train.txt / <class>_val.txt files
+```
+
+Classes: aeroplane, car, horse, motorbike, person, plus `background` (negatives).
+
+## 3. Full pipeline (in order)
+
+```bash
+# 3.1 Train/val/test split  -> ../data/splits/splits.json
+python make_splits.py
+
+# 3.2 Hand-crafted encoders (trained on the train subset only) -> ../data/encoders/
+python -m src.train -e bovw -k 512 -c 0 --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encoders
+python -m src.train -e vlad -k 32 -c 80 --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encoders
+python -m src.train -e fv   -k 32 -c 80 --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encoders
+
+# 3.3 Extra BoVW vocabularies (K x seeds) for the vocabulary-size study (Parts 1 and 5)
+python -m handcrafted.build_encoders --seeds 0 1 2 --ks 32 64 128 256 512 1024
+
+# 3.4 Extract hand-crafted embeddings -> ../data/encodings/<encoder>/
+python -m src.extract -e ../data/encoders/bovw_K512_C0.npz --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encodings/ --cache-dir cache/ -f
+python -m src.extract -e ../data/encoders/vlad_K32_C80.npz --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encodings/ --cache-dir cache/ -f
+python -m src.extract -e ../data/encoders/fv_K32_C80.npz   --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encodings/ --cache-dir cache/ -f
+# repeat for bovw_K256_C0.npz and bovw_K1024_C0.npz (needed by Part 5)
+
+# 3.5 Frozen deep features (ResNet-18 layers 2-4, ViT-B/32, DINOv2, CLIP; with and without flip)
+python -m src.extract_deep
+
+# 3.6 Notebooks, in order
+#   1_handcraft_final.ipynb -> 2_deep_models.ipynb -> 3_part4_pretrained.ipynb -> 4_part5_retrieval.ipynb
+```
+
+Useful options:
+
+- `src.train`: `-i` images per class (default 150), `-n` descriptors per image
+  (default 400), `--cache-dir`.
+- `src.extract`: `-f` overwrite, `-j` threads, `--catg` subset of classes
+  (always include `background`).
+- `src.extract_deep`: `-m` models (`resnet18 vit_b_32 dinov2_vits14
+  clip_vit_b_32`), `--flip both|none|only`, `-b` batch size, `-f` overwrite.
+
+Outputs:
+
+- Encoders: `../data/encoders/<ENCODER>_K<K>_C<C>.npz` (`C0` = no PCA).
+- Embeddings: `../data/encodings/<feature>/<class>_{train,val,test}.npz`, each
+  with `file_names` and `histograms` (one row per image).
+- Tables and figures: `../results/` (Part 4 in `results/part4/`, Part 5 in
+  `results/part5/`).
+
+## 4. Evaluation protocol
+
+`make_splits.py` builds a fixed split (seed 42) from the original files:
+
+| Subset | Source | Images |
+|--------|--------|--------|
+| `train` | 80% of the original `*_train.txt` | 1977 |
+| `val`   | 20% of the original `*_train.txt` | 495  |
+| `test`  | the original `*_val.txt` (unchanged) | 2474 |
+
+The split is stratified by each image's combination of classes (the dataset is
+multi-label). Encoders and SVMs are trained on `train`. Hyperparameters (SVM
+`C`, K, PCA dimension, layer, etc.) are chosen on `val`. `test` is used only
+once, for the final numbers. Small-data experiments use at least 3 seeds and
+report mean ± std.
+
+`data_distribution.py` prints dataset statistics (class counts, multi-label
+overlap, co-occurrence, image sizes) and saves plots to
+`../docs/data_distribution/`.
+
+## 5. Project structure
+
+```text
+code/
+├── make_splits.py              # Builds data/splits/splits.json.
+├── data_distribution.py        # Dataset statistics and plots.
+├── handcrafted/
+│   └── build_encoders.py       # Extra BoVW vocabularies (K x seeds) + fit times.
 ├── src/
-│   ├── train.py                # Train BoVW, VLAD, or Fisher encoders.
-│   ├── extract.py              # Extract embeddings using a trained encoder.
-│   ├── encoders.py             # Encoder implementations and image aggregation.
+│   ├── train.py                # Train BoVW / VLAD / Fisher encoders.
+│   ├── extract.py              # Extract embeddings with a trained encoder.
+│   ├── encoders.py             # Encoder implementations and aggregation.
+│   ├── features.py             # Image preparation, dense SIFT/PHOW.
+│   ├── utils.py                # Dataset tables, splits, SVM helpers.
+│   ├── visualization.py        # Rankings, PR curves, embedding plots.
 │   ├── deep_models.py          # Pretrained models and intermediate features.
 │   ├── extract_deep.py         # Cache frozen ResNet/ViT/DINOv2/CLIP features.
-│   ├── evaluate.py             # Part 4: SVM/C selection, AP, few-shot, CLIP, maps.
-│   ├── retrieval.py            # Part 5: corpus/queries, similarity ranking, P@K/R@K/AP.
-│   ├── features.py             # Image preparation and dense SIFT/PHOW features.
-│   ├── utils.py                # Dataset tables, splits, and SVM helpers.
-│   └── visualization.py        # Ranking, precision-recall, and embedding plots.
-├── data_distribution.py        # Dataset statistics and plots.
-├── make_splits.py              # Builds data/splits/splits.json.
-├── 1_handcraft.ipynb           # Hand-crafted feature experiments.
-├── 2_deep_models.ipynb         # Deep-model features and CAM visualization.
-├── 3_part4_pretrained.ipynb    # Part 4, Stages A-F + comparison table.
-├── 4_part5_retrieval.ipynb     # Part 5, retrieval challenge (Stages A-C).
+│   ├── metrics.py              # AP, mAP, P@K, R@K, PR curves.
+│   ├── evaluate.py             # Part 4: C selection, AP, few-shot, CLIP zero-shot, CAM.
+│   └── retrieval.py            # Part 5: queries, similarity ranking, P@K/R@K/AP.
+├── 1_handcraft_final.ipynb     # Parts 1-2.
+├── 2_deep_models.ipynb         # Part 3.
+├── 3_part4_pretrained.ipynb    # Part 4.
+├── 4_part5_retrieval.ipynb     # Part 5.
+├── env.yml / env-win.yml       # Conda environments.
+└── requirements.txt            # Pip dependencies.
 ```
 
-Part 4 outputs (CSV tables and figures) are written to `results/part4/`;
-Part 5 outputs to `results/part5/`.
+## 6. Reused code and references
 
-Encoder files are named `<ENCODER>_K<K>_C<C>.npz`, where `K<K>` is the number of
-visual words or GMM components and `C<C>` is the PCA dimension. `C0` means PCA
-is disabled. Extracted files use the same encoder name as a directory, for
-example:
+**Starter code provided by the course (IACV 2026/27).** The following files come
+from the assignment's base code. They were adapted to read the train/val/test
+split from `splits.json`; the algorithms are unchanged:
 
-```text
-data/encodings/bovw_K512_C0/
-├── aeroplane_train.npz
-├── aeroplane_val.npz
-├── aeroplane_test.npz
-├── background_train.npz
-└── ...
-```
+- `src/train.py`, `src/extract.py`, `src/encoders.py`, `src/features.py`,
+  `src/utils.py`, `src/visualization.py`, `src/deep_models.py`, `env.yml`,
+  `env-win.yml`, `requirements.txt`.
 
-Each encoding archive contains `file_names` and `histograms`. The latter is a
-matrix with one row per image.
+**Written by the group:** `make_splits.py`, `data_distribution.py`,
+`handcrafted/build_encoders.py` (reuses the sampling and k-means code from
+`src/train.py`), `src/extract_deep.py`, `src/metrics.py`, `src/evaluate.py`,
+`src/retrieval.py`, and the four notebooks.
 
-> **Paths.** `python -m src.*` must be run from this directory (`code/`),
-> while the dataset lives one level up in `../data/`. The commands below
-> therefore pass the `../data/...` paths explicitly.
+**External libraries and pretrained models:**
 
-## Data Analysis and Splits
-
-### Data distribution (`data_distribution.py`)
-
-```bash
-python data_distribution.py
-```
-
-Reads the original split files in `data/splits/` and prints:
-
-- number of images per class in the original `train` and `val` files;
-- number of unique images per subset and the overlap between them (should be 0);
-- number of classes per image (the dataset is **multi-label**: the same image
-  can appear in, e.g., `person_train.txt` and `horse_train.txt`);
-- class co-occurrence matrix;
-- image size statistics.
-
-Plots are saved to `../docs/data_distribution/` (`class_counts.png`,
-`cooccurrence.png`, `image_sizes.png`).
-
-### Train / validation / test split (`make_splits.py`)
-
-The original files are split into `*_train.txt` and `*_val.txt`. The protocol
-requires a validation set taken from the training data, so:
-
-| New subset | Source                            | Images |
-|------------|-----------------------------------|--------|
-| `train`    | 80% of the original `*_train.txt` | 1977   |
-| `val`      | 20% of the original `*_train.txt` | 495    |
-| `test`     | the original `*_val.txt` (unchanged) | 2474 |
-
-```bash
-python make_splits.py
-```
-
-- **Stratified by class:** images are stratified by their *combination* of
-  classes (e.g. `horse+person`), so both per-class proportions and the
-  multi-label cases are preserved. Every class has 19.6–20.1% of its training
-  images in `val`. Combinations with fewer than 5 images are grouped together.
-- **Fixed seed (42):** running the script again produces exactly the same file.
-- **Output:** `data/splits/splits.json`, with a `meta` block (seed, fraction,
-  per-class counts) and, for each subset, a mapping `image id -> [classes]`.
-  The original `.txt` files are only read, never modified.
-
-**The whole team should use the same `splits.json`.** Do not regenerate it
-with a different seed or fraction.
-
-To load a subset in Python (same table format as `loadSamplesTable`):
-
-```python
-from src.utils import loadSplitsTable, loadSplitsDataTables
-
-df_train = loadSplitsTable("../data/splits/splits.json", "../data/images", subset="train")
-df_all = loadSplitsDataTables("../data/splits/splits.json", "../data/images")  # adds a 'subset' column
-```
-
-## Train Encoders
-
-Encoders are trained **only on the `train` subset of `splits.json`**, so they
-never see validation or test images.
-
-> Encoders trained before `splits.json` existed used the full original
-> training set (including the images that are now `val`) and must be
-> **retrained**.
-
-Train a BoVW encoder with 512 visual words and no PCA, and VLAD and Fisher
-encoders with 32 components and an 80-dimensional PCA projection:
-
-```bash
-python -m src.train -e bovw -k 512 -c 0 \
-  --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encoders
-
-python -m src.train -e vlad -k 32 -c 80 \
-  --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encoders
-
-python -m src.train -e fv -k 32 -c 80 \
-  --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encoders
-```
-
-The resulting configurations are written to `data/encoders/` using names such
-as `vlad_K32_C80.npz`. Useful options include:
-
-```text
---splits-file    splits.json from make_splits.py (default: data/splits/splits.json)
---img-dir        Image directory (default: data/images)
---output-dir     Encoder output directory (default: data/encoders)
--i, --per-class  Images sampled per class; -1 uses all (default: 150)
--n, --per-image  Local descriptors sampled per image (default: 400)
--j, --jobs       Reserved parallel-job option (default: 4)
---cache-dir      Optional feature-cache directory (default: disabled)
-```
-
-## Extract Embeddings
-
-Extraction writes one file per class and subset, `<class>_train.npz`,
-`<class>_val.npz` and `<class>_test.npz`, using `splits.json`.
-
-> Encodings extracted before `splits.json` existed have a `*_val.npz` that
-> actually contains the **test** images. After retraining the encoders,
-> re-extract **with `-f`** so the old files are overwritten.
-
-```bash
-python -m src.extract -e ../data/encoders/bovw_K512_C0.npz \
-  --splits-file ../data/splits/splits.json --img-dir ../data/images \
-  --output-dir ../data/encodings/ --cache-dir cache/ -f
-
-python -m src.extract -e ../data/encoders/vlad_K32_C80.npz \
-  --splits-file ../data/splits/splits.json --img-dir ../data/images \
-  --output-dir ../data/encodings/ --cache-dir cache/ -f
-
-python -m src.extract -e ../data/encoders/fv_K32_C80.npz \
-  --splits-file ../data/splits/splits.json --img-dir ../data/images \
-  --output-dir ../data/encodings/ --cache-dir cache/ -f
-```
-
-Extraction writes files under a directory named after the encoder, for
-example `data/encodings/vlad_K32_C80/`. By default, existing files are kept;
-add `-f` to overwrite them. Use `-j` to control the number of worker threads
-and `--cache-dir cache/` to reuse cached local descriptors. Add `--catg` to
-extract only some classes (always include `background`, which is used as the
-negative class):
-
-```bash
-python -m src.extract \
-  -e ../data/encoders/vlad_K32_C80.npz \
-  --splits-file ../data/splits/splits.json --img-dir ../data/images \
-  --output-dir ../data/encodings/ \
-  --catg background motorbike aeroplane person \
-  --cache-dir cache/ \
-  -j 4 \
-  -f
-```
-
-## Required Changes in `1_handcraft.ipynb`
-
-After re-extracting the encodings, the notebook must be updated. It currently
-loads `subset="val"` as its **test** data; after re-extraction that file is
-the new **validation** set. The intended protocol is: train on `train`, choose
-hyperparameters on `val`, evaluate **once** on `test`.
-
-1. **Data loading cell**: load the three subsets.
-
-   ```python
-   histograms, labels, names = loadEncodingSubset(category, encoding, subset="train")
-   valHistograms, valLabels, valNames = loadEncodingSubset(category, encoding, subset="val")
-   testHistograms, testLabels, testNames = loadEncodingSubset(category, encoding, subset="test")
-   ```
-
-   Also add `printDatasetStats(valHistograms, valNames, valLabels, subset="val")`.
-
-2. **SVM training cell**: choose `C` on the validation set instead of fixing
-   `C=10`.
-
-   ```python
-   from sklearn.metrics import average_precision_score
-
-   val_ap = {}
-   for C in [0.01, 0.1, 1, 10, 100]:
-       W, b = utils.train_svm(histograms, labels, C=C)
-       val_ap[C] = average_precision_score(valLabels, W @ valHistograms.T + b)
-       print(f"C={C:<6} val AP={val_ap[C]:.4f}")
-
-   best_C = max(val_ap, key=val_ap.get)
-   W, b = utils.train_svm(histograms, labels, C=best_C)
-   print("Best C:", best_C)
-   ```
-
-   The same applies to other choices (encoder type, `K`, PCA dimension,
-   training fraction in `get_subset`): compare them on `val`, not on `test`.
-
-3. **Stage C (test) cells**: keep using `testHistograms`, `testLabels` and
-   `testNames` (now loaded from `subset="test"`), and run them only with the
-   final model chosen in step 2. Nothing else changes in these cells.
-
-## Deep Models and References
-
-The deep-model notebook uses pretrained backbones and utilities from these
-projects:
-
-- [TorchVision models documentation](https://pytorch.org/vision/stable/models.html)
-  and [TorchVision GitHub repository](https://github.com/pytorch/vision) for
-  ResNet-18 and ViT-B/32 weights and preprocessing.
-- [DINOv2 GitHub repository](https://github.com/facebookresearch/dinov2) for
-  the self-supervised `dinov2_vits14` model loaded through Torch Hub.
-- [OpenAI CLIP GitHub repository](https://github.com/openai/CLIP) for the
-  `ViT-B/32` image-text model and preprocessing pipeline.
-
-These models may download pretrained weights the first time they are loaded.
-The notebook automatically selects CUDA when available and otherwise uses CPU.
-
-## Part 5 — Retrieval challenge
-
-`4_part5_retrieval.ipynb` ranks the test images by similarity to motorbike
-queries (train images) or to CLIP text prompts. It needs the cached features of
-Parts 1-4 plus BoVW with K = 256 and 1024 for the vocabulary-size question:
-
-```bash
-python -m src.train -e bovw -k 256 -c 0   --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encoders
-python -m src.extract -e ../data/encoders/bovw_K256_C0.npz   --splits-file ../data/splits/splits.json --img-dir ../data/images --output-dir ../data/encodings/ --cache-dir ""
-# repeat with -k 1024 / bovw_K1024_C0.npz
-```
-
-If those folders are missing, the notebook runs with K = 512 only.
-Details: `../docs/Parte5_implementacao.md`.
+- [VLFeat](https://www.vlfeat.org/) through
+  [cyvlfeat](https://github.com/menpo/cyvlfeat): dense SIFT (PHOW), k-means,
+  GMM, VLAD and Fisher encoding.
+- [scikit-learn](https://scikit-learn.org/): linear SVMs, PCA, AP metrics.
+- [TorchVision](https://github.com/pytorch/vision)
+  ([models](https://pytorch.org/vision/stable/models.html)): ResNet-18 and
+  ViT-B/32 ImageNet weights and preprocessing.
+- [DINOv2](https://github.com/facebookresearch/dinov2): `dinov2_vits14`, loaded
+  with `torch.hub`.
+- [OpenAI CLIP](https://github.com/openai/CLIP): `ViT-B/32` image and text
+  encoders.
+- [OpenCV](https://opencv.org/), [scikit-image](https://scikit-image.org/),
+  [pandas](https://pandas.pydata.org/), [matplotlib](https://matplotlib.org/).
